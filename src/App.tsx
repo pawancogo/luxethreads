@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { UserProvider } from "@/contexts/UserContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Home from "@/pages/Home";
@@ -14,6 +15,8 @@ import Cart from "@/pages/Cart";
 import Auth from "@/pages/Auth";
 import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
+import SupplierDashboard from "@/pages/SupplierDashboard";
+
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +40,17 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                  
+                  {/* Supplier Routes */}
+                  <Route
+                    path="/supplier"
+                    element={
+                      <ProtectedRoute allowedRoles="supplier">
+                        <SupplierDashboard />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>

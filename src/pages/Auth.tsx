@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useUser } from '@/contexts/UserContext';
+import { useUser, UserRole } from '@/contexts/UserContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 const Auth = () => {
@@ -13,12 +14,18 @@ const Auth = () => {
     name: '',
     email: '',
     password: '',
+    role: 'customer' as UserRole,
+    companyName: '',
+    taxId: '',
+    phone: '',
   });
   const { user, login, signup, isLoading } = useUser();
   const { toast } = useToast();
 
   if (user) {
-    return <Navigate to="/" replace />;
+    // Redirect based on user role
+    const redirectPath = user.role === 'supplier' ? '/supplier' : '/';
+    return <Navigate to={redirectPath} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,7 +49,15 @@ const Auth = () => {
           });
         }
       } else {
-        success = await signup(formData.name, formData.email, formData.password);
+        success = await signup(
+          formData.name, 
+          formData.email, 
+          formData.password, 
+          formData.role,
+          formData.companyName,
+          formData.taxId,
+          formData.phone
+        );
         if (success) {
           toast({
             title: "Account created!",
@@ -72,6 +87,13 @@ const Auth = () => {
     });
   };
 
+  const handleRoleChange = (value: UserRole) => {
+    setFormData({
+      ...formData,
+      role: value,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
@@ -89,18 +111,77 @@ const Auth = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
-                <div>
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    required={!isLogin}
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Enter your full name"
-                  />
-                </div>
+                <>
+                  <div>
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      type="text"
+                      required={!isLogin}
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="role">Account Type</Label>
+                    <Select value={formData.role} onValueChange={handleRoleChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="customer">Customer</SelectItem>
+                        <SelectItem value="supplier">Supplier</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.role === 'supplier' && (
+                    <>
+                      <div>
+                        <Label htmlFor="companyName">Company Name</Label>
+                        <Input
+                          id="companyName"
+                          name="companyName"
+                          type="text"
+                          required
+                          value={formData.companyName}
+                          onChange={handleInputChange}
+                          placeholder="Enter your company name"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="taxId">Tax ID</Label>
+                          <Input
+                            id="taxId"
+                            name="taxId"
+                            type="text"
+                            required
+                            value={formData.taxId}
+                            onChange={handleInputChange}
+                            placeholder="Tax ID"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="phone">Phone</Label>
+                          <Input
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            required
+                            value={formData.phone}
+                            onChange={handleInputChange}
+                            placeholder="Phone number"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
               )}
 
               <div>
@@ -152,9 +233,13 @@ const Auth = () => {
 
             {/* Demo Credentials */}
             <div className="mt-4 p-3 bg-gray-100 rounded-md">
-              <p className="text-sm text-gray-600 text-center">
-                <strong>Demo:</strong> Use any email and password to sign in
+              <p className="text-sm text-gray-600 text-center mb-2">
+                <strong>Demo Accounts:</strong>
               </p>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>• Customer: any email + password</p>
+                <p>• Supplier: include "supplier" in email</p>
+              </div>
             </div>
           </CardContent>
         </Card>
