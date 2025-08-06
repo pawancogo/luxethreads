@@ -16,7 +16,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
-  const rating = 4.2; // Mock rating
+  const rating = 4; // Mock rating
   const ratingCount = Math.floor(Math.random() * 1000) + 100; // Mock rating count
 
   return (
