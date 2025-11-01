@@ -1,0 +1,390 @@
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+
+// Create axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => {
+    // Handle response format from backend: { success, message, data }
+    if (response.data && response.data.success !== undefined) {
+      // Backend standardized response format
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      // If success is false, treat as error
+      if (!response.data.success) {
+        const message = response.data.message || 'Operation failed';
+        const errors = response.data.errors || [];
+        const error = new Error(message) as any;
+        error.errors = errors;
+        return Promise.reject(error);
+      }
+    }
+    // Fallback for non-standard responses
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    return response.data;
+  },
+  (error) => {
+    if (error.response) {
+      // Handle API errors from backend
+      const responseData = error.response.data || {};
+      
+      // Backend error format: { success: false, message, errors }
+      if (responseData.success === false) {
+        const message = responseData.message || 'An error occurred';
+        const errors = responseData.errors || [];
+        const errorObj = new Error(message) as any;
+        errorObj.errors = errors;
+        errorObj.status = error.response.status;
+        return Promise.reject(errorObj);
+      }
+      
+      // Fallback error handling
+      const message = responseData.message || responseData.error || 'An error occurred';
+      const errors = responseData.errors || [];
+      const errorObj = new Error(message) as any;
+      errorObj.errors = errors;
+      errorObj.status = error.response.status;
+      return Promise.reject(errorObj);
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ==================== Authentication ====================
+export const authAPI = {
+  signup: async (userData: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_number: string;
+    password: string;
+    role: string;
+  }) => {
+    const response = await api.post('/signup', { user: userData });
+    if (response.token) {
+      localStorage.setItem('auth_token', response.token);
+    }
+    return response;
+  },
+
+  login: async (email: string, password: string) => {
+    const response = await api.post('/login', { email, password });
+    if (response.token) {
+      localStorage.setItem('auth_token', response.token);
+    }
+    return response;
+  },
+
+  logout: () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+  },
+};
+
+// ==================== Products ====================
+export const productsAPI = {
+  // Public products (for customers)
+  getPublicProducts: async (page: number = 1, perPage: number = 20) => {
+    return api.get('/public/products', {
+      params: { page, per_page: perPage },
+    });
+  },
+
+  getPublicProduct: async (id: string | number) => {
+    return api.get(`/public/products/${id}`);
+  },
+
+  // Supplier products
+  getSupplierProducts: async () => {
+    return api.get('/products');
+  },
+
+  getSupplierProduct: async (id: string | number) => {
+    return api.get(`/products/${id}`);
+  },
+
+  createProduct: async (productData: {
+    name: string;
+    description: string;
+    category_id: number;
+    brand_id: number;
+  }) => {
+    return api.post('/products', { product: productData });
+  },
+
+  updateProduct: async (id: string | number, productData: Partial<{
+    name: string;
+    description: string;
+    category_id: number;
+    brand_id: number;
+  }>) => {
+    return api.put(`/products/${id}`, { product: productData });
+  },
+
+  deleteProduct: async (id: string | number) => {
+    return api.delete(`/products/${id}`);
+  },
+
+  // Product variants
+  createVariant: async (productId: string | number, variantData: {
+    sku: string;
+    price: number;
+    discounted_price?: number;
+    stock_quantity: number;
+    weight_kg?: number;
+  }) => {
+    return api.post(`/products/${productId}/product_variants`, { product_variant: variantData });
+  },
+
+  updateVariant: async (productId: string | number, variantId: string | number, variantData: Partial<{
+    sku: string;
+    price: number;
+    discounted_price: number;
+    stock_quantity: number;
+    weight_kg: number;
+  }>) => {
+    return api.put(`/products/${productId}/product_variants/${variantId}`, { product_variant: variantData });
+  },
+
+  deleteVariant: async (productId: string | number, variantId: string | number) => {
+    return api.delete(`/products/${productId}/product_variants/${variantId}`);
+  },
+
+  // Search
+  searchProducts: async (params: {
+    query?: string;
+    category_id?: number;
+    brand_id?: number;
+    min_price?: number;
+    max_price?: number;
+    page?: number;
+    per_page?: number;
+  }) => {
+    return api.get('/search', { params });
+  },
+};
+
+// ==================== Categories & Brands ====================
+export const categoriesAPI = {
+  getAll: async () => {
+    return api.get('/categories');
+  },
+};
+
+export const brandsAPI = {
+  getAll: async () => {
+    return api.get('/brands');
+  },
+};
+
+// ==================== Cart ====================
+export const cartAPI = {
+  getCart: async () => {
+    return api.get('/cart');
+  },
+
+  addToCart: async (productVariantId: number, quantity: number = 1) => {
+    return api.post('/cart_items', {
+      product_variant_id: productVariantId,
+      quantity,
+    });
+  },
+
+  updateCartItem: async (cartItemId: number, quantity: number) => {
+    return api.put(`/cart_items/${cartItemId}`, { quantity });
+  },
+
+  removeFromCart: async (cartItemId: number) => {
+    return api.delete(`/cart_items/${cartItemId}`);
+  },
+};
+
+// ==================== Wishlist ====================
+export const wishlistAPI = {
+  getWishlist: async () => {
+    return api.get('/wishlist/items');
+  },
+
+  addToWishlist: async (productVariantId: number) => {
+    return api.post('/wishlist/items', {
+      product_variant_id: productVariantId,
+    });
+  },
+
+  removeFromWishlist: async (wishlistItemId: number) => {
+    return api.delete(`/wishlist/items/${wishlistItemId}`);
+  },
+};
+
+// ==================== Addresses ====================
+export const addressesAPI = {
+  getAddresses: async () => {
+    return api.get('/addresses');
+  },
+
+  createAddress: async (addressData: {
+    address_type: 'shipping' | 'billing';
+    full_name: string;
+    phone_number: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  }) => {
+    return api.post('/addresses', { address: addressData });
+  },
+
+  updateAddress: async (addressId: number, addressData: Partial<{
+    full_name: string;
+    phone_number: string;
+    line1: string;
+    line2: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  }>) => {
+    return api.put(`/addresses/${addressId}`, { address: addressData });
+  },
+
+  deleteAddress: async (addressId: number) => {
+    return api.delete(`/addresses/${addressId}`);
+  },
+};
+
+// ==================== Orders ====================
+export const ordersAPI = {
+  createOrder: async (orderData: {
+    shipping_address_id: number;
+    billing_address_id: number;
+    shipping_method?: string;
+    payment_method_id?: string;
+  }) => {
+    return api.post('/orders', { order: orderData });
+  },
+
+  getMyOrders: async () => {
+    return api.get('/my-orders');
+  },
+
+  getOrderDetails: async (orderId: string | number) => {
+    return api.get(`/my-orders/${orderId}`);
+  },
+};
+
+// ==================== Supplier Orders ====================
+export const supplierOrdersAPI = {
+  getSupplierOrders: async () => {
+    return api.get('/supplier/orders');
+  },
+
+  getSupplierOrderItem: async (itemId: string | number) => {
+    return api.get(`/supplier/orders/${itemId}`);
+  },
+
+  shipOrderItem: async (itemId: string | number, trackingNumber: string) => {
+    return api.put(`/supplier/orders/${itemId}/ship`, { tracking_number: trackingNumber });
+  },
+};
+
+// ==================== Supplier Profile ====================
+export const supplierProfileAPI = {
+  getProfile: async () => {
+    return api.get('/supplier_profile');
+  },
+
+  createProfile: async (profileData: {
+    company_name: string;
+    gst_number: string;
+    description?: string;
+    website_url?: string;
+  }) => {
+    return api.post('/supplier_profile', { supplier_profile: profileData });
+  },
+
+  updateProfile: async (profileData: Partial<{
+    company_name: string;
+    gst_number: string;
+    description: string;
+    website_url: string;
+  }>) => {
+    return api.put('/supplier_profile', { supplier_profile: profileData });
+  },
+};
+
+// ==================== Reviews ====================
+export const reviewsAPI = {
+  createReview: async (productId: number, reviewData: {
+    rating: number;
+    comment: string;
+  }) => {
+    return api.post(`/products/${productId}/reviews`, { review: reviewData });
+  },
+
+  getProductReviews: async (productId: number) => {
+    return api.get(`/products/${productId}/reviews`);
+  },
+};
+
+// ==================== Return Requests ====================
+export const returnRequestsAPI = {
+  createReturnRequest: async (returnData: {
+    order_id: number;
+    resolution_type: 'refund' | 'replacement';
+    items: Array<{
+      order_item_id: number;
+      quantity: number;
+      reason: string;
+    }>;
+    media?: Array<{
+      file_key: string;
+      media_type: 'image' | 'video';
+    }>;
+  }) => {
+    return api.post('/return_requests', {
+      return_request: {
+        order_id: returnData.order_id,
+        resolution_type: returnData.resolution_type,
+      },
+      items: returnData.items,
+      media: returnData.media,
+    });
+  },
+
+  getMyReturns: async () => {
+    return api.get('/my-returns');
+  },
+
+  getReturnDetails: async (returnId: string | number) => {
+    return api.get(`/return_requests/${returnId}`);
+  },
+};
+
+export default api;

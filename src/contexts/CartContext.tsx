@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { cartAPI } from '@/services/api';
+import { useUser } from './UserContext';
 
 export interface Product {
   id: string;
@@ -16,31 +18,42 @@ export interface Product {
   featured?: boolean;
 }
 
-export interface CartItem extends Product {
+export interface CartItem {
+  cartItemId: number;
+  productVariantId: number;
+  productId: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  image: string;
   quantity: number;
   selectedColor: string;
   selectedSize: string;
+  brandName?: string;
+  categoryName?: string;
 }
 
 interface CartState {
   items: CartItem[];
   total: number;
   itemCount: number;
+  isLoading: boolean;
 }
 
 type CartAction =
   | { type: 'ADD_TO_CART'; payload: { product: Product; color: string; size: string } }
-  | { type: 'REMOVE_FROM_CART'; payload: string }
-  | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }
+  | { type: 'REMOVE_FROM_CART'; payload: number } // cart_item_id
+  | { type: 'UPDATE_QUANTITY'; payload: { cartItemId: number; quantity: number } }
   | { type: 'CLEAR_CART' }
-  | { type: 'LOAD_CART'; payload: CartState };
+  | { type: 'LOAD_CART'; payload: CartState }
+  | { type: 'SET_LOADING'; payload: boolean };
 
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
     case 'ADD_TO_CART': {
       const { product, color, size } = action.payload;
       const existingItemIndex = state.items.findIndex(
-        item => item.id === product.id && item.selectedColor === color && item.selectedSize === size
+        item => item.productId === product.id && item.selectedColor === color && item.selectedSize === size
       );
 
       if (existingItemIndex > -1) {
@@ -48,10 +61,16 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         updatedItems[existingItemIndex].quantity += 1;
         const total = updatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const itemCount = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-        return { items: updatedItems, total, itemCount };
+        return { ...state, items: updatedItems, total, itemCount };
       } else {
         const newItem: CartItem = {
-          ...product,
+          cartItemId: 0, // Will be set by backend
+          productVariantId: 0, // Will be set when adding
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          image: product.image,
           quantity: 1,
           selectedColor: color,
           selectedSize: size,
@@ -59,31 +78,31 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         const items = [...state.items, newItem];
         const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-        return { items, total, itemCount };
+        return { ...state, items, total, itemCount };
       }
     }
     case 'REMOVE_FROM_CART': {
-      const items = state.items.filter(item => 
-        `${item.id}-${item.selectedColor}-${item.selectedSize}` !== action.payload
-      );
+      const items = state.items.filter(item => item.cartItemId !== action.payload);
       const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-      return { items, total, itemCount };
+      return { ...state, items, total, itemCount };
     }
     case 'UPDATE_QUANTITY': {
       const items = state.items.map(item =>
-        `${item.id}-${item.selectedColor}-${item.selectedSize}` === action.payload.id
+        item.cartItemId === action.payload.cartItemId
           ? { ...item, quantity: Math.max(0, action.payload.quantity) }
           : item
       ).filter(item => item.quantity > 0);
       const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-      return { items, total, itemCount };
+      return { ...state, items, total, itemCount };
     }
     case 'CLEAR_CART':
-      return { items: [], total: 0, itemCount: 0 };
+      return { ...state, items: [], total: 0, itemCount: 0 };
     case 'LOAD_CART':
-      return action.payload;
+      return { ...action.payload, isLoading: false };
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
     default:
       return state;
   }
@@ -91,48 +110,133 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 
 const CartContext = createContext<{
   state: CartState;
-  addToCart: (product: Product, color: string, size: string) => void;
-  removeFromCart: (itemId: string) => void;
-  updateQuantity: (itemId: string, quantity: number) => void;
-  clearCart: () => void;
+  addToCart: (product: Product, color: string, size: string) => Promise<void>;
+  removeFromCart: (cartItemId: number) => Promise<void>;
+  updateQuantity: (cartItemId: number, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+  loadCart: () => Promise<void>;
 } | null>(null);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useUser();
   const [state, dispatch] = useReducer(cartReducer, {
     items: [],
     total: 0,
     itemCount: 0,
+    isLoading: false,
   });
 
+  // Load cart from backend on mount and when user changes
   useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) {
-      dispatch({ type: 'LOAD_CART', payload: JSON.parse(savedCart) });
+    if (user) {
+      loadCart();
+    } else {
+      // Clear cart if user logs out
+      dispatch({ type: 'CLEAR_CART' });
     }
-  }, []);
+  }, [user]);
 
-  useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(state));
-  }, [state]);
+  // Map backend cart response to CartItem[]
+  const mapBackendCartItems = (backendCart: any): CartState => {
+    const cartItems = backendCart.cart_items || [];
+    const items: CartItem[] = cartItems.map((item: any) => {
+      const variant = item.product_variant || {};
+      return {
+        cartItemId: item.cart_item_id,
+        productVariantId: variant.variant_id || variant.id,
+        productId: variant.product_id?.toString() || '',
+        name: variant.product_name || '',
+        price: variant.discounted_price || variant.price || 0,
+        originalPrice: variant.discounted_price ? variant.price : undefined,
+        image: variant.image_url || '',
+        quantity: item.quantity,
+        selectedColor: 'Default', // Backend doesn't provide attributes in cart
+        selectedSize: 'Default',
+        brandName: variant.brand_name,
+        categoryName: variant.category_name,
+      };
+    });
 
-  const addToCart = (product: Product, color: string, size: string) => {
+    return {
+      items,
+      total: backendCart.total_price || 0,
+      itemCount: backendCart.item_count || 0,
+      isLoading: false,
+    };
+  };
+
+  const loadCart = async () => {
+    if (!user) return;
+    
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const response = await cartAPI.getCart();
+      const cartState = mapBackendCartItems(response);
+      dispatch({ type: 'LOAD_CART', payload: cartState });
+    } catch (error) {
+      console.error('Error loading cart:', error);
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
+  const addToCart = async (product: Product, color: string, size: string) => {
+    // Note: This is kept for backward compatibility but should use variant_id directly
+    // For now, we'll still use the old flow and sync with backend after
     dispatch({ type: 'ADD_TO_CART', payload: { product, color, size } });
+    
+    // If user is logged in, cart is synced automatically through ProductDetail
+    // which calls cartAPI.addToCart directly
   };
 
-  const removeFromCart = (itemId: string) => {
-    dispatch({ type: 'REMOVE_FROM_CART', payload: itemId });
+  const removeFromCart = async (cartItemId: number) => {
+    try {
+      await cartAPI.removeFromCart(cartItemId);
+      dispatch({ type: 'REMOVE_FROM_CART', payload: cartItemId });
+      // Reload cart to get updated totals
+      await loadCart();
+    } catch (error) {
+      console.error('Error removing from cart:', error);
+      throw error;
+    }
   };
 
-  const updateQuantity = (itemId: string, quantity: number) => {
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { id: itemId, quantity } });
+  const updateQuantity = async (cartItemId: number, quantity: number) => {
+    if (quantity <= 0) {
+      await removeFromCart(cartItemId);
+      return;
+    }
+
+    try {
+      await cartAPI.updateCartItem(cartItemId, quantity);
+      dispatch({ type: 'UPDATE_QUANTITY', payload: { cartItemId, quantity } });
+      // Reload cart to get updated totals
+      await loadCart();
+    } catch (error) {
+      console.error('Error updating cart:', error);
+      throw error;
+    }
   };
 
-  const clearCart = () => {
-    dispatch({ type: 'CLEAR_CART' });
+  const clearCart = async () => {
+    try {
+      // Remove all items from backend
+      for (const item of state.items) {
+        if (item.cartItemId > 0) {
+          try {
+            await cartAPI.removeFromCart(item.cartItemId);
+          } catch (error) {
+            console.error('Error removing item:', error);
+          }
+        }
+      }
+      dispatch({ type: 'CLEAR_CART' });
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+    }
   };
 
   return (
-    <CartContext.Provider value={{ state, addToCart, removeFromCart, updateQuantity, clearCart }}>
+    <CartContext.Provider value={{ state, addToCart, removeFromCart, updateQuantity, clearCart, loadCart }}>
       {children}
     </CartContext.Provider>
   );

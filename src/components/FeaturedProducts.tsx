@@ -1,11 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { mockProducts } from '@/data/mockProducts';
+import { productsAPI } from '@/services/api';
+import { mapBackendProductToList } from '@/lib/productMapper';
+import { Product } from '@/contexts/CartContext';
 import ProductCard from './ProductCard';
 import { Button } from '@/components/ui/button';
+import ProductSkeleton from './ProductSkeleton';
 
 const FeaturedProducts = () => {
-  const featuredProducts = mockProducts.filter(product => product.featured).slice(0, 4);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFeaturedProducts = async () => {
+      try {
+        setIsLoading(true);
+        const response = await productsAPI.getPublicProducts(1, 4);
+        
+        // API interceptor extracts data, so response is already the array/object
+        // Backend returns array of products directly after interceptor
+        const products = Array.isArray(response) ? response : ((response as any)?.products || []);
+        const mappedProducts = products.map(mapBackendProductToList);
+        setFeaturedProducts(mappedProducts);
+      } catch (error) {
+        console.error('Error loading featured products:', error);
+        setFeaturedProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFeaturedProducts();
+  }, []);
 
   return (
     <section className="pt-20 pb-10 bg-white">
@@ -20,9 +46,19 @@ const FeaturedProducts = () => {
         </div>
 
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, index) => (
+              <ProductSkeleton key={index} />
+            ))
+          ) : featuredProducts.length > 0 ? (
+            featuredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))
+          ) : (
+            <div className="col-span-4 text-center py-8 text-gray-600">
+              No featured products available at the moment.
+            </div>
+          )}
         </div>
 
         <div className="mt-10 text-center">

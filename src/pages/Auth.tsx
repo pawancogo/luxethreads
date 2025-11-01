@@ -11,13 +11,14 @@ import { useToast } from '@/hooks/use-toast';
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
+    phone_number: '',
     password: '',
     role: 'customer' as UserRole,
     companyName: '',
     taxId: '',
-    phone: '',
   });
   const { user, login, signup, isLoading } = useUser();
   const { toast } = useToast();
@@ -28,53 +29,107 @@ const Auth = () => {
     return <Navigate to={redirectPath} replace />;
   }
 
+  const getErrorMessage = (error: Error | undefined): { title: string; description: string } => {
+    if (!error) {
+      return {
+        title: isLogin ? "Login failed" : "Signup failed",
+        description: isLogin 
+          ? "Please check your credentials and try again."
+          : "Please try again with different details."
+      };
+    }
+
+    // Extract backend error message
+    const message = error.message || '';
+    const errors = (error as any).errors || [];
+    
+    // If backend provided errors array, use them
+    if (errors.length > 0) {
+      return {
+        title: message || (isLogin ? "Login failed" : "Signup failed"),
+        description: errors.join(', ') || "Please check your information and try again."
+      };
+    }
+
+    // Use backend message if available
+    if (message) {
+      return {
+        title: isLogin ? "Login failed" : "Signup failed",
+        description: message
+      };
+    }
+
+    // Fallback to static error
+    return {
+      title: isLogin ? "Login failed" : "Signup failed",
+      description: isLogin 
+        ? "Please check your credentials and try again."
+        : "Please try again with different details."
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      let success = false;
+      let result;
       
       if (isLogin) {
-        success = await login(formData.email, formData.password);
-        if (success) {
+        result = await login(formData.email, formData.password);
+        if (result.success) {
           toast({
             title: "Welcome back!",
             description: "You have successfully logged in.",
           });
         } else {
+          const errorMsg = getErrorMessage(result.error);
           toast({
-            title: "Login failed",
-            description: "Please check your credentials and try again.",
+            title: errorMsg.title,
+            description: errorMsg.description,
             variant: "destructive",
           });
         }
       } else {
-        success = await signup(
-          formData.name, 
+        // Validate required fields
+        if (!formData.firstName || !formData.lastName || !formData.phone_number) {
+          toast({
+            title: "Missing required fields",
+            description: "Please fill in first name, last name, and phone number.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        result = await signup(
+          `${formData.firstName} ${formData.lastName}`, // Full name for context
           formData.email, 
           formData.password, 
           formData.role,
           formData.companyName,
           formData.taxId,
-          formData.phone
+          formData.phone_number,
+          formData.firstName,
+          formData.lastName
         );
-        if (success) {
+        if (result.success) {
           toast({
             title: "Account created!",
             description: "Your account has been created successfully.",
           });
         } else {
+          const errorMsg = getErrorMessage(result.error);
           toast({
-            title: "Signup failed",
-            description: "Please try again with different details.",
+            title: errorMsg.title,
+            description: errorMsg.description,
             variant: "destructive",
           });
         }
       }
     } catch (error) {
+      const errorMsg = getErrorMessage(error as Error);
       toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
+        title: errorMsg.title,
+        description: errorMsg.description,
         variant: "destructive",
       });
     }
@@ -112,16 +167,43 @@ const Auth = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="firstName">First Name *</Label>
+                      <Input
+                        id="firstName"
+                        name="firstName"
+                        type="text"
+                        required
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        placeholder="First name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name *</Label>
+                      <Input
+                        id="lastName"
+                        name="lastName"
+                        type="text"
+                        required
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        placeholder="Last name"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <Label htmlFor="name">Full Name</Label>
+                    <Label htmlFor="phone_number">Phone Number *</Label>
                     <Input
-                      id="name"
-                      name="name"
-                      type="text"
-                      required={!isLogin}
-                      value={formData.name}
+                      id="phone_number"
+                      name="phone_number"
+                      type="tel"
+                      required
+                      value={formData.phone_number}
                       onChange={handleInputChange}
-                      placeholder="Enter your full name"
+                      placeholder="Enter your phone number"
                     />
                   </div>
 
@@ -146,38 +228,22 @@ const Auth = () => {
                           id="companyName"
                           name="companyName"
                           type="text"
-                          required
                           value={formData.companyName}
                           onChange={handleInputChange}
                           placeholder="Enter your company name"
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="taxId">Tax ID</Label>
-                          <Input
-                            id="taxId"
-                            name="taxId"
-                            type="text"
-                            required
-                            value={formData.taxId}
-                            onChange={handleInputChange}
-                            placeholder="Tax ID"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="phone">Phone</Label>
-                          <Input
-                            id="phone"
-                            name="phone"
-                            type="tel"
-                            required
-                            value={formData.phone}
-                            onChange={handleInputChange}
-                            placeholder="Phone number"
-                          />
-                        </div>
+                      <div>
+                        <Label htmlFor="taxId">GST Number</Label>
+                        <Input
+                          id="taxId"
+                          name="taxId"
+                          type="text"
+                          value={formData.taxId}
+                          onChange={handleInputChange}
+                          placeholder="GST Number"
+                        />
                       </div>
                     </>
                   )}

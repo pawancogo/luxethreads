@@ -1,24 +1,127 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart } from 'lucide-react';
-import { mockProducts } from '@/data/mockProducts';
+import { productsAPI, cartAPI } from '@/services/api';
+import { mapBackendProductDetail, findVariantByAttributes } from '@/lib/productMapper';
+import { Product } from '@/contexts/CartContext';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import ProductSkeleton from '@/components/ProductSkeleton';
+
+interface BackendProductDetail {
+  id: number;
+  name: string;
+  description: string;
+  brand: { id: number; name: string; logo_url?: string };
+  category: { id: number; name: string };
+  supplier: { id: number; company_name: string; verified: boolean };
+  variants: Array<{
+    id: number;
+    sku: string;
+    price: number;
+    discounted_price?: number;
+    stock_quantity: number;
+    weight_kg?: number;
+    images: Array<{ id: number; url: string; alt_text?: string }>;
+    attributes: Array<{ attribute_type: string; attribute_value: string }>;
+  }>;
+  reviews: Array<any>;
+  total_reviews: number;
+  average_rating?: number;
+}
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { addToCart } = useCart();
   const { toast } = useToast();
+  const { loadCart } = useCart();
   
-  const product = mockProducts.find(p => p.id === id);
+  const [backendProduct, setBackendProduct] = useState<BackendProductDetail | null>(null);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
 
-  if (!product) {
+  useEffect(() => {
+    const loadProduct = async () => {
+      if (!id) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await productsAPI.getPublicProduct(id);
+        const productData = response as any as BackendProductDetail;
+        setBackendProduct(productData);
+        
+        // Map to frontend Product type  
+        const mappedProduct = mapBackendProductDetail(productData as any);
+        setProduct(mappedProduct);
+        
+        // Extract colors and sizes from variants
+        const colors = Array.from(new Set(
+          productData.variants.flatMap(v => 
+            v.attributes.filter(a => a.attribute_type.toLowerCase() === 'color').map(a => a.attribute_value)
+          )
+        ));
+        const sizes = Array.from(new Set(
+          productData.variants.flatMap(v => 
+            v.attributes.filter(a => a.attribute_type.toLowerCase() === 'size' || a.attribute_type.toLowerCase() === 'sizes')
+              .map(a => a.attribute_value)
+          )
+        ));
+        
+        // Set default selections
+        if (colors.length > 0) setSelectedColor(colors[0]);
+        if (sizes.length > 0) setSelectedSize(sizes[0]);
+        
+        // Find default variant
+        if (colors.length > 0 || sizes.length > 0) {
+          const defaultVariant = findVariantByAttributes(productData.variants, colors[0], sizes[0]);
+          if (defaultVariant) setSelectedVariantId(defaultVariant.id);
+        }
+      } catch (error) {
+        console.error('Error loading product:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load product details. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProduct();
+  }, [id]);
+
+  // Update variant when color/size changes
+  useEffect(() => {
+    if (backendProduct) {
+      const variant = findVariantByAttributes(backendProduct.variants, selectedColor, selectedSize);
+      setSelectedVariantId(variant?.id || null);
+      
+      // Update images when variant changes
+      if (variant && variant.images.length > 0) {
+        const variantImages = variant.images.map(img => img.url);
+        setProduct(prev => prev ? { ...prev, images: variantImages, image: variantImages[0] } : null);
+      }
+    }
+  }, [selectedColor, selectedSize, backendProduct]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <ProductSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  if (!product || !backendProduct) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -36,31 +139,32 @@ const ProductDetail = () => {
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
-  const handleAddToCart = () => {
-    if (!selectedColor && product.colors.length > 0) {
+  const handleAddToCart = async () => {
+    if (!selectedVariantId) {
       toast({
-        title: "Please select a color",
+        title: "Please select a variant",
+        description: "Please select color and size options.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!selectedSize && product.sizes.length > 0) {
+    try {
+      await cartAPI.addToCart(selectedVariantId, 1);
+      // Reload cart to update cart count
+      await loadCart();
       toast({
-        title: "Please select a size",
+        title: "Added to cart!",
+        description: `${product.name} has been added to your cart.`,
+      });
+    } catch (error: any) {
+      const errorMessage = error?.message || error?.errors?.[0] || "Failed to add to cart";
+      toast({
+        title: "Error",
+        description: errorMessage,
         variant: "destructive",
       });
-      return;
     }
-
-    const color = selectedColor || product.colors[0] || 'Default';
-    const size = selectedSize || product.sizes[0] || 'Default';
-
-    addToCart(product, color, size);
-    toast({
-      title: "Added to cart!",
-      description: `${product.name} has been added to your cart.`,
-    });
   };
 
   return (
@@ -127,9 +231,14 @@ const ProductDetail = () => {
                       ₹{product.originalPrice.toLocaleString()}
                     </span>
                     <Badge className="bg-red-100 text-red-800">
-                      {discountPercentage}% OFF
+                      {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
                     </Badge>
                   </>
+                )}
+                {backendProduct.average_rating && (
+                  <Badge className="bg-blue-100 text-blue-800">
+                    ⭐ {backendProduct.average_rating.toFixed(1)} ({backendProduct.total_reviews} reviews)
+                  </Badge>
                 )}
               </div>
 

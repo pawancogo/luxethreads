@@ -14,8 +14,8 @@ interface User {
 
 interface UserContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string, role?: UserRole, companyName?: string, taxId?: string, phone?: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: Error }>;
+  signup: (name: string, email: string, password: string, role?: UserRole, companyName?: string, taxId?: string, phone?: string, firstName?: string, lastName?: string) => Promise<{ success: boolean; error?: Error }>;
   logout: () => void;
   isLoading: boolean;
   hasRole: (roles: UserRole | UserRole[]) => boolean;
@@ -35,44 +35,32 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: Error }> => {
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (email && password) {
-      // Mock different user types based on email
-      let role: UserRole = 'customer';
-      let companyName: string | undefined;
-      let taxId: string | undefined;
-      let phone: string | undefined;
-
-      if (email.includes('supplier')) {
-        role = 'supplier';
-        companyName = 'Sample Company Ltd.';
-        taxId = 'TAX123456';
-        phone = '+1-555-0123';
-      }
-
+    try {
+      const { authAPI } = await import('../services/api');
+      const response = await authAPI.login(email, password);
+      
+      const userData = response.user || response.data?.user;
       const newUser: User = {
-        id: Date.now().toString(),
-        name: email.split('@')[0],
-        email,
-        role,
-        companyName,
-        taxId,
-        phone,
+        id: userData.id?.toString() || Date.now().toString(),
+        name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || email.split('@')[0],
+        email: userData.email || email,
+        role: userData.role === 'supplier' ? 'supplier' : 'customer',
+        companyName: userData.company_name,
+        taxId: userData.tax_id || userData.gst_number,
+        phone: userData.phone_number || userData.phone,
       };
       
       setUser(newUser);
       localStorage.setItem('user', JSON.stringify(newUser));
       setIsLoading(false);
-      return true;
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      setIsLoading(false);
+      return { success: false, error: error as Error };
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
   const signup = async (
@@ -82,31 +70,48 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role: UserRole = 'customer',
     companyName?: string,
     taxId?: string,
-    phone?: string
-  ): Promise<boolean> => {
+    phone?: string,
+    firstName?: string,
+    lastName?: string
+  ): Promise<{ success: boolean; error?: Error }> => {
     setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (name && email && password) {
-      const newUser: User = {
-        id: Date.now().toString(),
-        name,
+    try {
+      const { authAPI } = await import('../services/api');
+      const nameParts = name.split(' ');
+      const first_name = firstName || nameParts[0] || name;
+      const last_name = lastName || nameParts.slice(1).join(' ') || '';
+      
+      const userData = {
+        first_name,
+        last_name,
         email,
-        role,
+        phone_number: phone || '',
+        password,
+        role: role === 'supplier' ? 'supplier' : 'customer',
+      };
+      
+      const response = await authAPI.signup(userData);
+      
+      const userResponse = response.user || response.data?.user;
+      const newUser: User = {
+        id: userResponse.id?.toString() || Date.now().toString(),
+        name,
+        email: userResponse.email || email,
+        role: userResponse.role === 'supplier' ? 'supplier' : 'customer',
         companyName: role === 'supplier' ? companyName : undefined,
         taxId: role === 'supplier' ? taxId : undefined,
-        phone: role === 'supplier' ? phone : undefined,
+        phone: userResponse.phone_number || phone,
       };
       
       setUser(newUser);
       localStorage.setItem('user', JSON.stringify(newUser));
       setIsLoading(false);
-      return true;
+      return { success: true };
+    } catch (error) {
+      console.error('Signup error:', error);
+      setIsLoading(false);
+      return { success: false, error: error as Error };
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
   const logout = () => {

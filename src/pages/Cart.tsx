@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
@@ -7,12 +7,27 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const Cart = () => {
   const { state, removeFromCart, updateQuantity } = useCart();
+  const [updatingItem, setUpdatingItem] = useState<number | null>(null);
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
-      removeFromCart(itemId);
-    } else {
-      updateQuantity(itemId, newQuantity);
+  const handleQuantityChange = async (cartItemId: number, newQuantity: number) => {
+    setUpdatingItem(cartItemId);
+    try {
+      await updateQuantity(cartItemId, newQuantity);
+    } catch (error) {
+      // Error handling done in CartContext
+    } finally {
+      setUpdatingItem(null);
+    }
+  };
+
+  const handleRemoveItem = async (cartItemId: number) => {
+    setUpdatingItem(cartItemId);
+    try {
+      await removeFromCart(cartItemId);
+    } catch (error) {
+      // Error handling done in CartContext
+    } finally {
+      setUpdatingItem(null);
     }
   };
 
@@ -41,25 +56,38 @@ const Cart = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {state.items.map((item) => {
-              const itemId = `${item.id}-${item.selectedColor}-${item.selectedSize}`;
-              return (
-                <Card key={itemId}>
+            {state.isLoading ? (
+              <div className="text-center py-8 text-gray-600">Loading cart...</div>
+            ) : state.items.length === 0 ? (
+              <div className="text-center py-8 text-gray-600">Your cart is empty</div>
+            ) : (
+              state.items.map((item) => (
+                <Card key={item.cartItemId}>
                   <CardContent className="p-6">
                     <div className="flex items-center space-x-4">
                       <img
-                        src={item.image}
+                        src={item.image || '/placeholder.svg'}
                         alt={item.name}
                         className="w-20 h-20 object-cover rounded-md"
                       />
                       
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                        <p className="text-sm text-gray-600">
-                          {item.selectedColor} • {item.selectedSize}
-                        </p>
+                        {item.brandName && (
+                          <p className="text-sm text-gray-600">{item.brandName}</p>
+                        )}
+                        {item.selectedColor !== 'Default' && item.selectedSize !== 'Default' && (
+                          <p className="text-sm text-gray-600">
+                            {item.selectedColor} • {item.selectedSize}
+                          </p>
+                        )}
                         <p className="text-lg font-bold text-amber-600 mt-1">
                           ₹{item.price.toLocaleString()}
+                          {item.originalPrice && (
+                            <span className="text-sm text-gray-500 line-through ml-2">
+                              ₹{item.originalPrice.toLocaleString()}
+                            </span>
+                          )}
                         </p>
                       </div>
 
@@ -67,7 +95,8 @@ const Cart = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleQuantityChange(itemId, item.quantity - 1)}
+                          onClick={() => handleQuantityChange(item.cartItemId, item.quantity - 1)}
+                          disabled={updatingItem === item.cartItemId}
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
@@ -75,7 +104,8 @@ const Cart = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleQuantityChange(itemId, item.quantity + 1)}
+                          onClick={() => handleQuantityChange(item.cartItemId, item.quantity + 1)}
+                          disabled={updatingItem === item.cartItemId}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -84,7 +114,8 @@ const Cart = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeFromCart(itemId)}
+                        onClick={() => handleRemoveItem(item.cartItemId)}
+                        disabled={updatingItem === item.cartItemId}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -92,8 +123,8 @@ const Cart = () => {
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })}
+              ))
+            )}
           </div>
 
           {/* Order Summary */}
