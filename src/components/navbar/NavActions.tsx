@@ -41,22 +41,35 @@ const NavActions: React.FC = () => {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">
-              <User className="mr-2 h-4 w-4" />
-              <span>My Profile</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">
-              <Package className="mr-2 h-4 w-4" />
-              <span>Orders</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">
-              <Heart className="mr-2 h-4 w-4" />
-              <span>Wishlist</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">
-              <CreditCard className="mr-2 h-4 w-4" />
-              <span>Payments</span>
-            </DropdownMenuItem>
+            {user.role === 'supplier' ? (
+              <Link to="/supplier">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Package className="mr-2 h-4 w-4" />
+                  <span>Supplier Dashboard</span>
+                </DropdownMenuItem>
+              </Link>
+            ) : (
+              <>
+                <Link to="/profile">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>My Profile</span>
+                  </DropdownMenuItem>
+                </Link>
+                <Link to="/orders">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Package className="mr-2 h-4 w-4" />
+                    <span>My Orders</span>
+                  </DropdownMenuItem>
+                </Link>
+              </>
+            )}
+            <Link to="/wishlist">
+              <DropdownMenuItem className="cursor-pointer">
+                <Heart className="mr-2 h-4 w-4" />
+                <span>Wishlist</span>
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuItem className="cursor-pointer">
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>

@@ -16,6 +16,9 @@ import Auth from "@/pages/Auth";
 import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
 import SupplierDashboard from "@/pages/SupplierDashboard";
+import Profile from "@/pages/Profile";
+import Orders from "@/pages/Orders";
+import Wishlist from "@/pages/Wishlist";
 
 import NotFound from "@/pages/NotFound";
 
@@ -40,6 +43,32 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                  
+                  {/* User Routes */}
+                  <Route
+                    path="/profile"
+                    element={
+                      <ProtectedRoute>
+                        <Profile />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/orders"
+                    element={
+                      <ProtectedRoute>
+                        <Orders />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/wishlist"
+                    element={
+                      <ProtectedRoute>
+                        <Wishlist />
+                      </ProtectedRoute>
+                    }
+                  />
                   
                   {/* Supplier Routes */}
                   <Route

@@ -6,7 +6,7 @@ import { ShieldX } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: UserRole | UserRole[];
+  allowedRoles?: UserRole | UserRole[];
   redirectTo?: string;
 }
 
@@ -29,7 +29,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={redirectTo} replace />;
   }
 
-  if (!hasRole(allowedRoles)) {
+  if (allowedRoles && !hasRole(allowedRoles)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <Card className="max-w-md w-full">
