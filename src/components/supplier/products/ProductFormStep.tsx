@@ -67,26 +67,33 @@ const ProductFormStep: React.FC<ProductFormStepProps> = ({
   }, [productForm.category_id]);
 
   const loadAttributeTypes = async () => {
+    if (!productForm.category_id) {
+      setAttributeTypes([]);
+      return;
+    }
+    
     try {
       setIsLoadingAttributes(true);
       // Load only product-level attributes (Fabric, Material, etc.)
       const categoryId = parseInt(productForm.category_id);
       const response = await attributeTypesAPI.getAll('product', categoryId);
-      console.log('Loaded product-level attribute types response:', response);
       
+      // API interceptor already extracts data, so response is the data directly
       let data: any[] = [];
       if (Array.isArray(response)) {
         data = response;
-      } else if (response?.data && Array.isArray(response.data)) {
-        data = response.data;
       } else if (typeof response === 'object' && response !== null) {
-        data = (response as any).data || [];
+        // If response is an object, check if it has data property or is already the array
+        // @ts-ignore - Response format may vary, handled safely
+        data = (response as any).data || (response as any).attribute_types || response || [];
       }
       
-      const attributeTypesArray: AttributeType[] = Array.isArray(data) ? data : [];
+      // Filter to only include attribute types that have values
+      const attributeTypesArray: AttributeType[] = (Array.isArray(data) ? data : [])
+        .filter((type: any) => type.values && type.values.length > 0);
+      
       setAttributeTypes(attributeTypesArray);
     } catch (error: any) {
-      console.error('Failed to load attribute types:', error);
       setAttributeTypes([]);
     } finally {
       setIsLoadingAttributes(false);
@@ -247,159 +254,163 @@ const ProductFormStep: React.FC<ProductFormStepProps> = ({
         </div>
 
         {/* Product-Level Attributes Section */}
-        {productForm.category_id && (
-          <div className="border rounded-lg p-4">
-            <button
-              type="button"
-              onClick={() => toggleSection('attributes')}
-              className="flex items-center justify-between w-full mb-4"
-            >
-              <h3 className="font-semibold text-lg">
-                Product Attributes (Fabric, Material, etc.)
-                {attributeTypes.length > 0 && (
-                  <span className="ml-2 text-sm text-gray-500 font-normal">
-                    ({attributeTypes.length} available)
-                  </span>
-                )}
-              </h3>
-              {expandedSections.has('attributes') ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
+        <div className="border rounded-lg p-4">
+          <button
+            type="button"
+            onClick={() => toggleSection('attributes')}
+            className="flex items-center justify-between w-full mb-4"
+          >
+            <h3 className="font-semibold text-lg">
+              Product Attributes (Fabric, Material, etc.)
+              {attributeTypes.length > 0 && (
+                <span className="ml-2 text-sm text-gray-500 font-normal">
+                  ({attributeTypes.length} available)
+                </span>
               )}
-            </button>
-            {expandedSections.has('attributes') && (
-              <div className="space-y-4">
-                {isLoadingAttributes ? (
-                  <p className="text-sm text-gray-500">Loading attributes...</p>
-                ) : attributeTypes.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    No product-level attributes available. Select a category first.
-                  </p>
-                ) : (
-                  <>
-                    {/* Selected Attributes Tags */}
-                    {selectedAttributes.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {selectedAttributes.map((attr) => {
-                          return (
-                            <div
-                              key={`${attr.attributeTypeId}-${attr.attributeValueId}`}
-                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border bg-blue-50 text-blue-700 border-blue-200"
-                            >
-                              <span className="font-semibold">{attr.attributeTypeName}:</span>
-                              <span>{attr.attributeValue}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveAttribute(attr.attributeTypeId)}
-                                className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
-                                title="Remove attribute"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Add Attribute Selector */}
-                    {getAvailableAttributeTypes().length > 0 && (
-                      <div className="border rounded-lg p-3 bg-gray-50">
-                        {!showAttributeSelector ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowAttributeSelector(true)}
-                            className="w-full"
+            </h3>
+            {expandedSections.has('attributes') ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+          {expandedSections.has('attributes') && (
+            <div className="space-y-4">
+              {!productForm.category_id ? (
+                <p className="text-sm text-gray-500">
+                  Please select a category first to see available product-level attributes.
+                </p>
+              ) : isLoadingAttributes ? (
+                <p className="text-sm text-gray-500">Loading attributes...</p>
+              ) : attributeTypes.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No product-level attributes available for this category.
+                </p>
+              ) : (
+                <>
+                  {/* Selected Attributes Tags */}
+                  {selectedAttributes.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {selectedAttributes.map((attr) => {
+                        return (
+                          <div
+                            key={`${attr.attributeTypeId}-${attr.attributeValueId}`}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border bg-blue-50 text-blue-700 border-blue-200"
                           >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Attribute
-                          </Button>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="grid gap-1">
-                                <Label className="text-xs">Attribute Type</Label>
-                                <Select
-                                  value={newAttributeTypeId?.toString() || undefined}
-                                  onValueChange={(value) => {
-                                    setNewAttributeTypeId(parseInt(value));
-                                    setNewAttributeValueId(null);
-                                  }}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select type" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAvailableAttributeTypes().map((type) => (
-                                      <SelectItem key={type.id} value={type.id.toString()}>
-                                        {type.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="grid gap-1">
-                                <Label className="text-xs">Value</Label>
-                                <Select
-                                  value={newAttributeValueId?.toString() || undefined}
-                                  onValueChange={(value) => setNewAttributeValueId(parseInt(value))}
-                                  disabled={!newAttributeTypeId}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select value" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAttributeTypeValues(newAttributeTypeId).map((value) => (
-                                      <SelectItem key={value.id} value={value.id.toString()}>
-                                        {value.value}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={handleAddAttribute}
-                                disabled={!newAttributeTypeId || !newAttributeValueId}
-                                className="flex-1"
-                              >
-                                Add
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setShowAttributeSelector(false);
-                                  setNewAttributeTypeId(null);
+                            <span className="font-semibold">{attr.attributeTypeName}:</span>
+                            <span>{attr.attributeValue}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAttribute(attr.attributeTypeId)}
+                              className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
+                              title="Remove attribute"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add Attribute Selector */}
+                  {getAvailableAttributeTypes().length > 0 ? (
+                    <div className="border rounded-lg p-3 bg-gray-50">
+                      {!showAttributeSelector ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAttributeSelector(true)}
+                          className="w-full"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Attribute
+                        </Button>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="grid gap-1">
+                              <Label className="text-xs">Attribute Type</Label>
+                              <Select
+                                value={newAttributeTypeId?.toString() || undefined}
+                                onValueChange={(value) => {
+                                  setNewAttributeTypeId(parseInt(value));
                                   setNewAttributeValueId(null);
                                 }}
                               >
-                                Cancel
-                              </Button>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {getAvailableAttributeTypes().map((type) => (
+                                    <SelectItem key={type.id} value={type.id.toString()}>
+                                      {type.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid gap-1">
+                              <Label className="text-xs">Value</Label>
+                              <Select
+                                value={newAttributeValueId?.toString() || undefined}
+                                onValueChange={(value) => setNewAttributeValueId(parseInt(value))}
+                                disabled={!newAttributeTypeId}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select value" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {getAttributeTypeValues(newAttributeTypeId).map((value) => (
+                                    <SelectItem key={value.id} value={value.id.toString()}>
+                                      {value.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    {getAvailableAttributeTypes().length === 0 && selectedAttributes.length > 0 && (
-                      <p className="text-xs text-gray-500 italic">
-                        All product-level attributes have been added.
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleAddAttribute}
+                              disabled={!newAttributeTypeId || !newAttributeValueId}
+                              className="flex-1"
+                            >
+                              Add
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setShowAttributeSelector(false);
+                                setNewAttributeTypeId(null);
+                                setNewAttributeValueId(null);
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : selectedAttributes.length > 0 ? (
+                    <p className="text-xs text-gray-500 italic">
+                      All product-level attributes have been added.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">
+                      No attributes available to add.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>

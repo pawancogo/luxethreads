@@ -45,14 +45,8 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
       setIsLoading(true);
       setError(null);
       const response = await productsAPI.getSupplierProducts();
-      // Handle both direct array and axios response structure
-      let products = Array.isArray(response) 
-        ? response 
-        : Array.isArray(response?.data) 
-        ? response.data 
-        : Array.isArray(response?.data?.data)
-        ? response.data.data
-        : [];
+      // API interceptor already extracts data, so response is the data directly
+      let products = Array.isArray(response) ? response : [];
       
       // Map backend response to frontend format
       // Backend returns 'variants', ensure it's mapped to both variants and product_variants for compatibility
@@ -93,8 +87,8 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
   }): Promise<number | null> => {
     try {
       const response = await productsAPI.createProduct(data);
-      // @ts-ignore - API response structure varies
-      const productId = response?.data?.id || response?.data?.data?.id || response?.id;
+      // API interceptor already extracts data
+      const productId = (response as any)?.id;
       if (productId) {
         await loadProducts();
         return productId;

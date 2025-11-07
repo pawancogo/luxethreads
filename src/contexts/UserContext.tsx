@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 export type UserRole = 'customer' | 'supplier';
 
@@ -21,7 +21,7 @@ interface UserContextType {
   hasRole: (roles: UserRole | UserRole[]) => boolean;
 }
 
-const UserContext = createContext<UserContextType | null>(null);
+export const UserContext = createContext<UserContextType | null>(null);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -35,13 +35,22 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: Error }> => {
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: Error }> => {
     setIsLoading(true);
     try {
       const { authAPI } = await import('../services/api');
       const response = await authAPI.login(email, password);
       
-      const userData = response.user || response.data?.user;
+      // The axios interceptor extracts response.data.data from the backend response
+      // Backend returns: { success: true, message: "...", data: { token, user } }
+      // After interceptor: response = { token, user }
+      // @ts-ignore - Response is transformed by interceptor
+      const userData = response?.user;
+      
+      if (!userData) {
+        throw new Error('Invalid login response: user data not found');
+      }
+      
       const newUser: User = {
         id: userData.id?.toString() || Date.now().toString(),
         name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || email.split('@')[0],
@@ -61,9 +70,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       return { success: false, error: error as Error };
     }
-  };
+  }, []);
 
-  const signup = async (
+  const signup = useCallback(async (
     name: string, 
     email: string, 
     password: string, 
@@ -92,10 +101,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const response = await authAPI.signup(userData);
       
-      const userResponse = response.user || response.data?.user;
+      // The axios interceptor extracts response.data.data from the backend response
+      // Backend returns: { success: true, message: "...", data: { token, user } }
+      // After interceptor: response = { token, user }
+      // @ts-ignore - Response is transformed by interceptor
+      const userResponse = response?.user;
+      
+      if (!userResponse || !userResponse.id) {
+        throw new Error('Invalid signup response: user data not found');
+      }
+      
       const newUser: User = {
         id: userResponse.id?.toString() || Date.now().toString(),
-        name,
+        name: userResponse.full_name || `${userResponse.first_name || ''} ${userResponse.last_name || ''}`.trim() || name,
         email: userResponse.email || email,
         role: userResponse.role === 'supplier' ? 'supplier' : 'customer',
         companyName: role === 'supplier' ? companyName : undefined,
@@ -112,21 +130,48 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       return { success: false, error: error as Error };
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
+    
+    // Clear localStorage
     localStorage.removeItem('user');
-  };
+    localStorage.removeItem('auth_token');
+    
+    // Clear specific auth cookies
+    document.cookie = 'authtoken=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+    
+    // Clear all other cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
+    // Redirect to login page if not already there
+    if (window.location.pathname !== '/auth') {
+      window.location.href = '/auth';
+    }
+  }, []);
 
-  const hasRole = (roles: UserRole | UserRole[]): boolean => {
+  const hasRole = useCallback((roles: UserRole | UserRole[]): boolean => {
     if (!user) return false;
     const roleArray = Array.isArray(roles) ? roles : [roles];
     return roleArray.includes(user.role);
-  };
+  }, [user]);
+
+  const value = useMemo(() => ({
+    user,
+    login,
+    signup,
+    logout,
+    isLoading,
+    hasRole,
+  }), [user, login, signup, logout, isLoading, hasRole]);
 
   return (
-    <UserContext.Provider value={{ user, login, signup, logout, isLoading, hasRole }}>
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   );

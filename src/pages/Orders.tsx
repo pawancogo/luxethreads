@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Package, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { ordersAPI } from '@/services/api';
@@ -38,7 +40,8 @@ const Orders = () => {
     setIsLoading(true);
     try {
       const response = await ordersAPI.getMyOrders();
-      setOrders(response?.data || []);
+      // API interceptor already extracts data, so response is the data directly
+      setOrders(Array.isArray(response) ? response : []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -101,7 +104,7 @@ const Orders = () => {
                       <div>
                         <CardTitle className="text-lg">Order #{order.order_number || order.id}</CardTitle>
                         <CardDescription>
-                          {new Date(order.order_date).toLocaleDateString()} - ${order.total_amount.toFixed(2)}
+                          {new Date(order.order_date).toLocaleDateString()} - ₹{order.total_amount.toLocaleString()}
                         </CardDescription>
                       </div>
                       <div className="flex gap-2">
@@ -122,9 +125,17 @@ const Orders = () => {
                             <p className="font-medium">{item.product_name}</p>
                             <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
                           </div>
-                          <p className="font-medium">${(item.price_at_purchase * item.quantity).toFixed(2)}</p>
+                          <p className="font-medium">₹{(item.price_at_purchase * item.quantity).toLocaleString()}</p>
                         </div>
                       ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <Link to={`/orders/${order.id}`}>
+                        <Button variant="outline" className="w-full">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Order Details
+                        </Button>
+                      </Link>
                     </div>
                   </CardContent>
                 </Card>

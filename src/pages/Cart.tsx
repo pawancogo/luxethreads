@@ -1,34 +1,99 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { ShoppingBag, X, CheckCircle } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
+import { useUser } from '@/contexts/UserContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import CartItem from '@/components/cart/CartItem';
+import { couponsAPI } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 
 const Cart = () => {
+  const { user } = useUser();
   const { state, removeFromCart, updateQuantity } = useCart();
+  const { toast } = useToast();
+  
+  // Redirect suppliers away from cart
+  if (user?.role === 'supplier') {
+    return <Navigate to="/supplier" replace />;
+  }
   const [updatingItem, setUpdatingItem] = useState<number | null>(null);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
-  const handleQuantityChange = async (cartItemId: number, newQuantity: number) => {
+  const handleQuantityChange = useCallback(async (cartItemId: number, newQuantity: number) => {
     setUpdatingItem(cartItemId);
     try {
       await updateQuantity(cartItemId, newQuantity);
-    } catch (error) {
-      // Error handling done in CartContext
     } finally {
       setUpdatingItem(null);
     }
-  };
+  }, [updateQuantity]);
 
-  const handleRemoveItem = async (cartItemId: number) => {
+  const handleRemoveItem = useCallback(async (cartItemId: number) => {
     setUpdatingItem(cartItemId);
     try {
       await removeFromCart(cartItemId);
-    } catch (error) {
-      // Error handling done in CartContext
     } finally {
       setUpdatingItem(null);
     }
+  }, [removeFromCart]);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast({
+        title: 'Coupon Code Required',
+        description: 'Please enter a coupon code',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    try {
+      // Validate coupon first
+      const validation = await couponsAPI.validateCoupon(couponCode.trim());
+      
+      if (validation && validation.is_valid) {
+        // Apply coupon
+        const result = await couponsAPI.applyCoupon(couponCode.trim(), state.total);
+        setAppliedCoupon(result);
+        setDiscountAmount(result.discount_amount || 0);
+        toast({
+          title: 'Coupon Applied!',
+          description: `You saved ₹${result.discount_amount || 0}`,
+        });
+      } else {
+        toast({
+          title: 'Invalid Coupon',
+          description: validation?.message || 'This coupon code is not valid',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to apply coupon',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setDiscountAmount(0);
+    toast({
+      title: 'Coupon Removed',
+      description: 'Coupon has been removed from your cart',
+    });
   };
 
   if (state.items.length === 0) {
@@ -61,69 +126,30 @@ const Cart = () => {
             ) : state.items.length === 0 ? (
               <div className="text-center py-8 text-gray-600">Your cart is empty</div>
             ) : (
-              state.items.map((item) => (
-                <Card key={item.cartItemId}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <img
-                        src={item.image || '/placeholder.svg'}
-                        alt={item.name}
-                        className="w-20 h-20 object-cover rounded-md"
-                      />
-                      
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                        {item.brandName && (
-                          <p className="text-sm text-gray-600">{item.brandName}</p>
-                        )}
-                        {item.selectedColor !== 'Default' && item.selectedSize !== 'Default' && (
-                          <p className="text-sm text-gray-600">
-                            {item.selectedColor} • {item.selectedSize}
-                          </p>
-                        )}
-                        <p className="text-lg font-bold text-amber-600 mt-1">
-                          ₹{item.price.toLocaleString()}
-                          {item.originalPrice && (
-                            <span className="text-sm text-gray-500 line-through ml-2">
-                              ₹{item.originalPrice.toLocaleString()}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center space-x-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuantityChange(item.cartItemId, item.quantity - 1)}
-                          disabled={updatingItem === item.cartItemId}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="font-semibold w-8 text-center">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuantityChange(item.cartItemId, item.quantity + 1)}
-                          disabled={updatingItem === item.cartItemId}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveItem(item.cartItemId)}
-                        disabled={updatingItem === item.cartItemId}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+              state.items.map((item) => {
+                const cartItem = {
+                  cart_item_id: item.cartItemId,
+                  quantity: item.quantity,
+                  product_variant: {
+                    variant_id: item.variantId || 0,
+                    product_id: parseInt(item.id),
+                    product_name: item.name,
+                    image_url: item.image,
+                    price: item.price,
+                    discounted_price: item.originalPrice,
+                  },
+                  subtotal: item.price * item.quantity,
+                };
+                return (
+                  <CartItem
+                    key={item.cartItemId}
+                    item={cartItem}
+                    updatingItem={updatingItem}
+                    onQuantityChange={handleQuantityChange}
+                    onRemoveItem={handleRemoveItem}
+                  />
+                );
+              })
             )}
           </div>
 
@@ -139,6 +165,20 @@ const Cart = () => {
                     <span className="font-semibold">₹{state.total.toLocaleString()}</span>
                   </div>
                   
+                  {appliedCoupon && discountAmount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <div className="flex items-center gap-2">
+                        <span>Discount ({appliedCoupon.code})</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {appliedCoupon.coupon_type === 'percentage' 
+                            ? `${appliedCoupon.discount_value}% OFF`
+                            : 'Applied'}
+                        </Badge>
+                      </div>
+                      <span className="font-semibold">-₹{discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between">
                     <span className="text-gray-600">Shipping</span>
                     <span className="font-semibold text-green-600">Free</span>
@@ -146,14 +186,14 @@ const Cart = () => {
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tax</span>
-                    <span className="font-semibold">₹{Math.round(state.total * 0.18).toLocaleString()}</span>
+                    <span className="font-semibold">₹{Math.round((state.total - discountAmount) * 0.18).toLocaleString()}</span>
                   </div>
                   
                   <div className="border-t pt-3">
                     <div className="flex justify-between">
                       <span className="text-lg font-bold text-gray-900">Total</span>
                       <span className="text-lg font-bold text-gray-900">
-                        ₹{Math.round(state.total * 1.18).toLocaleString()}
+                        ₹{Math.round((state.total - discountAmount) * 1.18).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -175,14 +215,51 @@ const Cart = () => {
 
                 {/* Promo Code */}
                 <div className="mt-6 pt-6 border-t">
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      placeholder="Promo code"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                    <Button variant="outline">Apply</Button>
-                  </div>
+                  {appliedCoupon ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-md border border-green-200">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800">
+                            {appliedCoupon.code} Applied
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveCoupon}
+                          className="h-6 w-6 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex space-x-2">
+                        <Input
+                          type="text"
+                          placeholder="Enter promo code"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          className="flex-1"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              handleApplyCoupon();
+                            }
+                          }}
+                        />
+                        <Button 
+                          variant="outline" 
+                          onClick={handleApplyCoupon}
+                          disabled={isApplyingCoupon || !couponCode.trim()}
+                        >
+                          {isApplyingCoupon ? 'Applying...' : 'Apply'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500">Enter a valid coupon code to get discounts</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

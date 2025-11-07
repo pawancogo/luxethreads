@@ -24,14 +24,8 @@ export const useCategoriesAndBrands = (): UseCategoriesAndBrandsReturn => {
     try {
       setIsLoadingCategories(true);
       const response = await categoriesAPI.getAll();
-      // Handle both direct array and axios response structure
-      const categories = Array.isArray(response) 
-        ? response 
-        : Array.isArray(response?.data) 
-        ? response.data 
-        : Array.isArray(response?.data?.data)
-        ? response.data.data
-        : [];
+      // API interceptor already extracts data, so response is the data directly
+      const categories = Array.isArray(response) ? response : [];
       setCategories(categories);
     } catch (err: any) {
       const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load categories';
@@ -50,14 +44,8 @@ export const useCategoriesAndBrands = (): UseCategoriesAndBrandsReturn => {
     try {
       setIsLoadingBrands(true);
       const response = await brandsAPI.getAll();
-      // Handle both direct array and axios response structure
-      const brands = Array.isArray(response) 
-        ? response 
-        : Array.isArray(response?.data) 
-        ? response.data 
-        : Array.isArray(response?.data?.data)
-        ? response.data.data
-        : [];
+      // API interceptor already extracts data, so response is the data directly
+      const brands = Array.isArray(response) ? response : [];
       setBrands(brands);
     } catch (err: any) {
       const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load brands';

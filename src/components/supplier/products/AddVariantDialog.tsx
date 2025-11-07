@@ -96,11 +96,9 @@ const AddVariantDialog: React.FC<AddVariantDialogProps> = ({
       let data: any[] = [];
       if (Array.isArray(response)) {
         data = response;
-      } else if (response?.data && Array.isArray(response.data)) {
-        data = response.data;
       } else if (typeof response === 'object' && response !== null) {
-        // Try to extract data from response object
-        data = (response as any).data || [];
+        // API interceptor already extracts data, so response is the data directly
+        data = [];
       }
       
       const attributeTypesArray: AttributeType[] = Array.isArray(data) ? data : [];

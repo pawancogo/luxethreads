@@ -9,6 +9,7 @@ import ProductsTabHeader from './products/ProductsTabHeader';
 import { SupplierProduct, Category, Brand, ProductVariantForm, ProductVariant } from './types';
 
 interface ProductsTabProps {
+  onProductsRefresh?: () => void;
   products: SupplierProduct[];
   isLoadingProducts: boolean;
   categories: Category[];
@@ -76,6 +77,7 @@ interface ProductsTabProps {
 }
 
 const ProductsTab: React.FC<ProductsTabProps> = ({
+  onProductsRefresh,
   products,
   isLoadingProducts,
   categories,
@@ -224,6 +226,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
           stock_quantity: '',
           weight_kg: '',
           image_urls: [''],
+          attribute_value_ids: [],
         });
       } catch (error) {
         // Error is handled by the parent handler
@@ -234,6 +237,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
   return (
     <Card>
       <ProductsTabHeader
+        onProductsRefresh={onProductsRefresh}
         isAddProductOpen={isAddProductOpen}
         onAddProductOpenChange={onAddProductOpenChange}
         productCreationStep={productCreationStep}
@@ -294,24 +298,26 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
         onCreateVariant={onCreateVariant}
       />
 
-      <EditProductDialog
-        isOpen={isEditProductOpen}
-        onOpenChange={(open) => onEditProductOpenChange(open)}
-        editingProduct={editingProduct}
-        productForm={editingProductForm || {
-          name: editingProduct?.name || '',
-          description: editingProduct?.description || '',
-          category_id: editingProduct?.category_id?.toString() || '',
-          brand_id: editingProduct?.brand_id?.toString() || '',
-          attribute_value_ids: (editingProduct as any)?.attributes?.map((attr: any) => {
-            // This is a placeholder - would need to map from attribute objects to IDs
-            // Better to pass through from parent component
-            return null;
-          }).filter(Boolean) as number[] || [],
-        }}
-        onEditingProductChange={onEditingProductChange}
-        onUpdateProduct={onUpdateProduct}
-      />
+          <EditProductDialog
+            isOpen={isEditProductOpen}
+            onOpenChange={(open) => onEditProductOpenChange(open)}
+            editingProduct={editingProduct}
+            productForm={editingProductForm || {
+              name: editingProduct?.name || '',
+              description: editingProduct?.description || '',
+              category_id: editingProduct?.category_id?.toString() || '',
+              brand_id: editingProduct?.brand_id?.toString() || '',
+              attribute_value_ids: (editingProduct as any)?.attributes?.map((attr: any) => {
+                // This is a placeholder - would need to map from attribute objects to IDs
+                // Better to pass through from parent component
+                return null;
+              }).filter(Boolean) as number[] || [],
+            }}
+            categories={categories}
+            brands={brands}
+            onEditingProductChange={onEditingProductChange}
+            onUpdateProduct={onUpdateProduct}
+          />
       
       <EditVariantDialog
         productName={editingProductId ? products.find((p) => p.id === editingProductId)?.name || '' : ''}
@@ -329,6 +335,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
               stock_quantity: '',
               weight_kg: '',
               image_urls: [''],
+              attribute_value_ids: [],
             });
           }
         }}

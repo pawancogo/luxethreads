@@ -5,7 +5,7 @@ import { Loader2, Heart, ShoppingCart } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { wishlistAPI } from '@/services/api';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 
 interface WishlistItem {
   wishlist_item_id: number;
@@ -25,6 +25,11 @@ const Wishlist = () => {
   const { toast } = useToast();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Redirect suppliers away from wishlist
+  if (user?.role === 'supplier') {
+    return <Navigate to="/supplier" replace />;
+  }
 
   useEffect(() => {
     if (user) {
@@ -36,7 +41,8 @@ const Wishlist = () => {
     setIsLoading(true);
     try {
       const response = await wishlistAPI.getWishlist();
-      setItems(response?.data || []);
+      // API interceptor already extracts data, so response is the data directly
+      setItems(Array.isArray(response) ? response : []);
     } catch (error: any) {
       toast({
         title: 'Error',

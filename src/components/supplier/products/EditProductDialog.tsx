@@ -42,6 +42,8 @@ interface EditProductDialogProps {
     brand_id: string;
     attribute_value_ids?: number[];
   };
+  categories: Array<{ id: number; name: string }>;
+  brands: Array<{ id: number; name: string }>;
   onEditingProductChange: (field: string, value: string | number[]) => void;
   onUpdateProduct: () => void;
 }
@@ -51,6 +53,8 @@ const EditProductDialog: React.FC<EditProductDialogProps> = ({
   onOpenChange,
   editingProduct,
   productForm,
+  categories,
+  brands,
   onEditingProductChange,
   onUpdateProduct,
 }) => {
@@ -70,24 +74,23 @@ const EditProductDialog: React.FC<EditProductDialogProps> = ({
         loadSelectedAttributesFromProduct();
       }
     }
-  }, [isOpen, editingProduct]);
+  }, [isOpen, editingProduct, productForm.category_id]);
 
   const loadAttributeTypes = async () => {
     try {
       setIsLoadingAttributes(true);
       // Load only product-level attributes (Fabric, Material, etc.)
       // Pass categoryId if available for any category-specific filtering
-      const categoryId = editingProduct?.category_id;
+      const categoryId = productForm.category_id ? parseInt(productForm.category_id) : editingProduct?.category_id;
       const response = await attributeTypesAPI.getAll('product', categoryId);
       console.log('Loaded product-level attribute types response:', response);
       
+      // API interceptor already extracts data, so response is the data directly
       let data: any[] = [];
       if (Array.isArray(response)) {
         data = response;
-      } else if (response?.data && Array.isArray(response.data)) {
-        data = response.data;
       } else if (typeof response === 'object' && response !== null) {
-        data = (response as any).data || [];
+        data = [];
       }
       
       const attributeTypesArray: AttributeType[] = Array.isArray(data) ? data : [];
@@ -281,6 +284,49 @@ const EditProductDialog: React.FC<EditProductDialogProps> = ({
                     onChange={(e) => onEditingProductChange('description', e.target.value)}
                     rows={4}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit_category">Category *</Label>
+                    <Select
+                      value={productForm.category_id}
+                      onValueChange={(value) => {
+                        onEditingProductChange('category_id', value);
+                        // Clear attributes when category changes
+                        setSelectedAttributes([]);
+                        onEditingProductChange('attribute_value_ids', []);
+                      }}
+                    >
+                      <SelectTrigger id="edit_category">
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit_brand">Brand *</Label>
+                    <Select
+                      value={productForm.brand_id}
+                      onValueChange={(value) => onEditingProductChange('brand_id', value)}
+                    >
+                      <SelectTrigger id="edit_brand">
+                        <SelectValue placeholder="Select Brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {brands.map((brand) => (
+                          <SelectItem key={brand.id} value={brand.id.toString()}>
+                            {brand.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             )}

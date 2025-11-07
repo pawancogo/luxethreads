@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Loader2 } from 'lucide-react';
+import { Edit, Loader2, MapPin } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,18 +31,40 @@ const Profile = () => {
   }, [user]);
 
   const handleSave = async () => {
+    if (!user) return;
+    
     setIsLoading(true);
     try {
-      // TODO: Implement profile update API call
+      const { usersAPI } = await import('@/services/api');
+      const updateData: { user: { first_name?: string; last_name?: string; phone_number?: string } } = {
+        user: {}
+      };
+      
+      // Split full name into first and last name
+      const nameParts = formData.name.trim().split(' ');
+      if (nameParts.length > 0) {
+        updateData.user.first_name = nameParts[0];
+        updateData.user.last_name = nameParts.slice(1).join(' ') || nameParts[0];
+      }
+      
+      if (formData.phone) {
+        updateData.user.phone_number = formData.phone;
+      }
+      
+      await usersAPI.updateUser(user.id, updateData.user);
+      
       toast({
         title: 'Success',
         description: 'Profile updated successfully',
       });
       setIsEditing(false);
+      
+      // Refresh user context
+      window.location.reload(); // Simple refresh - could be improved with context update
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to update profile',
+        description: error?.response?.data?.message || error?.message || 'Failed to update profile',
         variant: 'destructive',
       });
     } finally {
@@ -143,6 +166,14 @@ const Profile = () => {
                 <div className="mt-1">
                   <Badge variant="secondary">{user.role || 'customer'}</Badge>
                 </div>
+              </div>
+              <div className="pt-4 border-t">
+                <Link to="/addresses">
+                  <Button variant="outline" className="w-full">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Manage Addresses
+                  </Button>
+                </Link>
               </div>
             </div>
           )}

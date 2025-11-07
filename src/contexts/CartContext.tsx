@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
 import { cartAPI } from '@/services/api';
-import { useUser } from './UserContext';
+import { UserContext } from './UserContext';
 
 export interface Product {
   id: string;
@@ -118,23 +118,15 @@ const CartContext = createContext<{
 } | null>(null);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useUser();
+  // Use useContext directly to avoid throwing error if context is not available
+  const userContext = useContext(UserContext);
+  const user = userContext?.user || null;
   const [state, dispatch] = useReducer(cartReducer, {
     items: [],
     total: 0,
     itemCount: 0,
     isLoading: false,
   });
-
-  // Load cart from backend on mount and when user changes
-  useEffect(() => {
-    if (user) {
-      loadCart();
-    } else {
-      // Clear cart if user logs out
-      dispatch({ type: 'CLEAR_CART' });
-    }
-  }, [user]);
 
   // Map backend cart response to CartItem[]
   const mapBackendCartItems = (backendCart: any): CartState => {
@@ -165,7 +157,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -177,18 +169,28 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error loading cart:', error);
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, [user]);
 
-  const addToCart = async (product: Product, color: string, size: string) => {
+  // Load cart from backend on mount and when user changes
+  useEffect(() => {
+    if (user) {
+      loadCart();
+    } else {
+      // Clear cart if user logs out
+      dispatch({ type: 'CLEAR_CART' });
+    }
+  }, [user, loadCart]);
+
+  const addToCart = useCallback(async (product: Product, color: string, size: string) => {
     // Note: This is kept for backward compatibility but should use variant_id directly
     // For now, we'll still use the old flow and sync with backend after
     dispatch({ type: 'ADD_TO_CART', payload: { product, color, size } });
     
     // If user is logged in, cart is synced automatically through ProductDetail
     // which calls cartAPI.addToCart directly
-  };
+  }, []);
 
-  const removeFromCart = async (cartItemId: number) => {
+  const removeFromCart = useCallback(async (cartItemId: number) => {
     try {
       await cartAPI.removeFromCart(cartItemId);
       dispatch({ type: 'REMOVE_FROM_CART', payload: cartItemId });
@@ -198,9 +200,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error removing from cart:', error);
       throw error;
     }
-  };
+  }, [loadCart]);
 
-  const updateQuantity = async (cartItemId: number, quantity: number) => {
+  const updateQuantity = useCallback(async (cartItemId: number, quantity: number) => {
     if (quantity <= 0) {
       await removeFromCart(cartItemId);
       return;
@@ -215,9 +217,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error updating cart:', error);
       throw error;
     }
-  };
+  }, [loadCart, removeFromCart]);
 
-  const clearCart = async () => {
+  const clearCart = useCallback(async () => {
     try {
       // Remove all items from backend
       for (const item of state.items) {
@@ -233,10 +235,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error clearing cart:', error);
     }
-  };
+  }, [state.items]);
+
+  const value = useMemo(() => ({
+    state,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    loadCart,
+  }), [state, addToCart, removeFromCart, updateQuantity, clearCart, loadCart]);
 
   return (
-    <CartContext.Provider value={{ state, addToCart, removeFromCart, updateQuantity, clearCart, loadCart }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

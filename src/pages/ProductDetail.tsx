@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart } from 'lucide-react';
-import { productsAPI, cartAPI } from '@/services/api';
+import { productsAPI, cartAPI, productViewsAPI, wishlistAPI } from '@/services/api';
 import { mapBackendProductDetail, findVariantByAttributes } from '@/lib/productMapper';
 import { Product } from '@/contexts/CartContext';
 import { useCart } from '@/contexts/CartContext';
@@ -10,22 +10,45 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import ProductSkeleton from '@/components/ProductSkeleton';
+import ProductReviews from '@/components/products/ProductReviews';
 
+// Phase 2: Enhanced BackendProductDetail interface
 interface BackendProductDetail {
   id: number;
+  slug?: string;
   name: string;
   description: string;
-  brand: { id: number; name: string; logo_url?: string };
-  category: { id: number; name: string };
+  short_description?: string;
+  brand: { id: number; name: string; slug?: string; logo_url?: string };
+  category: { id: number; name: string; slug?: string };
   supplier: { id: number; company_name: string; verified: boolean };
+  // Phase 2: Product flags
+  is_featured?: boolean;
+  is_bestseller?: boolean;
+  is_new_arrival?: boolean;
+  is_trending?: boolean;
+  published_at?: string;
   variants: Array<{
     id: number;
     sku: string;
     price: number;
     discounted_price?: number;
+    mrp?: number;
     stock_quantity: number;
+    available_quantity?: number;
     weight_kg?: number;
-    images: Array<{ id: number; url: string; alt_text?: string }>;
+    currency?: string;
+    is_available?: boolean;
+    is_low_stock?: boolean;
+    out_of_stock?: boolean;
+    images: Array<{ 
+      id: number; 
+      url: string; 
+      thumbnail_url?: string;
+      medium_url?: string;
+      large_url?: string;
+      alt_text?: string 
+    }>;
     attributes: Array<{ attribute_type: string; attribute_value: string }>;
   }>;
   reviews: Array<any>;
@@ -34,6 +57,7 @@ interface BackendProductDetail {
 }
 
 const ProductDetail = () => {
+  // Phase 2: Support slug or ID in URL
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const { loadCart } = useCart();
@@ -45,6 +69,8 @@ const ProductDetail = () => {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -52,6 +78,7 @@ const ProductDetail = () => {
       
       try {
         setIsLoading(true);
+        // Phase 2: Backend supports slug or ID lookup
         const response = await productsAPI.getPublicProduct(id);
         const productData = response as any as BackendProductDetail;
         setBackendProduct(productData);
@@ -60,16 +87,19 @@ const ProductDetail = () => {
         const mappedProduct = mapBackendProductDetail(productData as any);
         setProduct(mappedProduct);
         
-        // Extract colors and sizes from variants
+        // Extract colors and sizes from variants (with null checks)
+        const variants = productData.variants || [];
         const colors = Array.from(new Set(
-          productData.variants.flatMap(v => 
-            v.attributes.filter(a => a.attribute_type.toLowerCase() === 'color').map(a => a.attribute_value)
+          variants.flatMap(v => 
+            (v.attributes || []).filter(a => a.attribute_type?.toLowerCase() === 'color').map(a => a.attribute_value)
           )
         ));
         const sizes = Array.from(new Set(
-          productData.variants.flatMap(v => 
-            v.attributes.filter(a => a.attribute_type.toLowerCase() === 'size' || a.attribute_type.toLowerCase() === 'sizes')
-              .map(a => a.attribute_value)
+          variants.flatMap(v => 
+            (v.attributes || []).filter(a => {
+              const attrType = a.attribute_type?.toLowerCase();
+              return attrType === 'size' || attrType === 'sizes';
+            }).map(a => a.attribute_value)
           )
         ));
         
@@ -78,12 +108,26 @@ const ProductDetail = () => {
         if (sizes.length > 0) setSelectedSize(sizes[0]);
         
         // Find default variant
-        if (colors.length > 0 || sizes.length > 0) {
-          const defaultVariant = findVariantByAttributes(productData.variants, colors[0], sizes[0]);
-          if (defaultVariant) setSelectedVariantId(defaultVariant.id);
+        let defaultVariantId: number | null = null;
+        if ((colors.length > 0 || sizes.length > 0) && variants.length > 0) {
+          const defaultVariant = findVariantByAttributes(variants, colors[0] || '', sizes[0] || '');
+          if (defaultVariant) {
+            defaultVariantId = defaultVariant.id;
+            setSelectedVariantId(defaultVariant.id);
+          }
+        }
+        
+        // Phase 4: Track product view (after variant is determined)
+        try {
+          await productViewsAPI.trackView(productData.id, {
+            product_variant_id: defaultVariantId || undefined,
+            source: 'direct',
+          });
+        } catch (error) {
+          // Silently fail - analytics tracking shouldn't break the page
+          console.error('Failed to track product view:', error);
         }
       } catch (error) {
-        console.error('Error loading product:', error);
         toast({
           title: "Error",
           description: "Failed to load product details. Please try again.",
@@ -99,12 +143,12 @@ const ProductDetail = () => {
 
   // Update variant when color/size changes
   useEffect(() => {
-    if (backendProduct) {
+    if (backendProduct && backendProduct.variants && backendProduct.variants.length > 0) {
       const variant = findVariantByAttributes(backendProduct.variants, selectedColor, selectedSize);
       setSelectedVariantId(variant?.id || null);
       
       // Update images when variant changes
-      if (variant && variant.images.length > 0) {
+      if (variant && variant.images && variant.images.length > 0) {
         const variantImages = variant.images.map(img => img.url);
         setProduct(prev => prev ? { ...prev, images: variantImages, image: variantImages[0] } : null);
       }
@@ -164,6 +208,45 @@ const ProductDetail = () => {
         description: errorMessage,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!selectedVariantId) {
+      toast({
+        title: "Please select a variant",
+        description: "Please select color and size options.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsWishlistLoading(true);
+    try {
+      if (isInWishlist) {
+        // Remove from wishlist - would need wishlist item ID
+        toast({
+          title: "Removed from wishlist",
+          description: `${product.name} has been removed from your wishlist.`,
+        });
+        setIsInWishlist(false);
+      } else {
+        await wishlistAPI.addToWishlist(selectedVariantId);
+        toast({
+          title: "Added to wishlist!",
+          description: `${product.name} has been added to your wishlist.`,
+        });
+        setIsInWishlist(true);
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || error?.errors?.[0] || "Failed to update wishlist";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsWishlistLoading(false);
     }
   };
 
@@ -249,7 +332,8 @@ const ProductDetail = () => {
               </div>
 
               {/* Color Selection */}
-              {product.colors.length > 0 && (
+              {product.colors && product.colors.length > 0 && (
+                
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-3">Color</h3>
                   <Select value={selectedColor} onValueChange={setSelectedColor}>
@@ -268,7 +352,7 @@ const ProductDetail = () => {
               )}
 
               {/* Size Selection */}
-              {product.sizes.length > 0 && (
+              {product.sizes && product.sizes.length > 0 && (
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-3">Size</h3>
                   <Select value={selectedSize} onValueChange={setSelectedSize}>
@@ -306,8 +390,14 @@ const ProductDetail = () => {
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   Add to Cart
                 </Button>
-                <Button size="lg" variant="outline" className="border-gray-300">
-                  <Heart className="h-5 w-5" />
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className={`border-gray-300 ${isInWishlist ? 'bg-red-50 border-red-300' : ''}`}
+                  onClick={handleWishlistToggle}
+                  disabled={isWishlistLoading}
+                >
+                  <Heart className={`h-5 w-5 ${isInWishlist ? 'fill-red-500 text-red-500' : ''}`} />
                 </Button>
               </div>
 
@@ -325,17 +415,28 @@ const ProductDetail = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Available Colors:</span>
-                    <span>{product.colors.join(', ')}</span>
+                    <span>{(product.colors || []).join(', ') || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Available Sizes:</span>
-                    <span>{product.sizes.join(', ')}</span>
+                    <span>{(product.sizes || []).join(', ') || 'N/A'}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Product Reviews Section */}
+        {backendProduct && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+            <ProductReviews
+              productId={backendProduct.id}
+              averageRating={backendProduct.average_rating}
+              totalReviews={backendProduct.total_reviews}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

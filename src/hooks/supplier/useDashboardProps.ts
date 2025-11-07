@@ -1,9 +1,10 @@
 import React from 'react';
-import { SupplierProduct, SupplierOrder, SupplierProfile, Category, Brand, ProductVariantForm } from '@/components/supplier/types';
+import { SupplierProduct, SupplierOrder, SupplierProfile, SupplierReturnRequest, SupplierPayment, Category, Brand, ProductVariantForm } from '@/components/supplier/types';
 
 export interface ProductTabProps {
   products: SupplierProduct[];
   isLoadingProducts: boolean;
+  onProductsRefresh?: () => void;
   categories: Category[];
   brands: Brand[];
   isAddProductOpen: boolean;
@@ -56,6 +57,14 @@ export interface ProductTabProps {
   onEditingProductChange: (field: string, value: string) => void;
   onUpdateProduct: () => void;
   onDeleteProduct: (productId: number) => void;
+  onEditVariant?: (productId: number, variantId: number, data: {
+    price: number;
+    discounted_price?: number;
+    stock_quantity: number;
+    weight_kg?: number;
+    image_urls?: string[];
+  }) => Promise<void>;
+  onDeleteVariant?: (productId: number, variantId: number) => Promise<void>;
   getStatusBadge: (status: string) => React.ReactNode;
   getProductMinPrice: (product: SupplierProduct) => string;
   getProductTotalStock: (product: SupplierProduct) => number;
@@ -64,14 +73,22 @@ export interface ProductTabProps {
 export interface OrderTabProps {
   orders: SupplierOrder[];
   isLoadingOrders: boolean;
-  isShipOrderOpen: boolean;
-  selectedOrderItemId: number | null;
-  selectedOrderId: number | null;
-  trackingNumber: string;
-  onShipOrder: () => void;
-  onTrackingNumberChange: (value: string) => void;
-  onShipOrderDialogChange: (open: boolean, orderItemId?: number, orderId?: number) => void;
+  onConfirmOrderItem: (orderItemId: number) => Promise<void>;
+  onShipOrder: (orderItemId: number, trackingNumber: string) => Promise<void>;
+  onUpdateTracking: (orderItemId: number, trackingNumber: string, trackingUrl?: string) => Promise<void>;
   getStatusBadge: (status: string) => React.ReactNode;
+}
+
+export interface ReturnsTabProps {
+  returns: SupplierReturnRequest[];
+  isLoadingReturns: boolean;
+  onApproveReturn: (returnId: number, notes?: string) => Promise<void>;
+  onRejectReturn: (returnId: number, rejectionReason: string) => Promise<void>;
+}
+
+export interface PayoutsTabProps {
+  payments: SupplierPayment[];
+  isLoadingPayments: boolean;
 }
 
 export interface ProfileTabProps {
@@ -88,6 +105,7 @@ export interface ProfileTabProps {
   onCancelEdit: () => void;
   onUpdateProfile: () => void;
   onProfileFormChange: (field: string, value: string) => void;
+  onProfileRefresh?: () => void;
 }
 
 export const useDashboardProps = (props: {
@@ -101,6 +119,9 @@ export const useDashboardProps = (props: {
   isLoadingProducts: boolean;
   isLoadingOrders: boolean;
   isLoadingProfile: boolean;
+  // Refresh callbacks
+  onProductsRefresh?: () => void;
+  onProfileRefresh?: () => void;
   // Product creation
   isAddProductOpen: boolean;
   onAddProductOpenChange: (open: boolean) => void;
@@ -162,14 +183,18 @@ export const useDashboardProps = (props: {
     image_urls?: string[];
   }) => Promise<void>;
   onDeleteVariant?: (productId: number, variantId: number) => Promise<void>;
-  // Ship order
-  isShipOrderOpen: boolean;
-  selectedOrderItemId: number | null;
-  selectedOrderId: number | null;
-  trackingNumber: string;
-  onTrackingNumberChange: (value: string) => void;
-  onShipOrderOpenChange: (open: boolean, orderItemId?: number, orderId?: number) => void;
-  onShipOrder: () => void;
+  // Order actions
+  onConfirmOrderItem: (orderItemId: number) => Promise<void>;
+  onShipOrder: (orderItemId: number, trackingNumber: string) => Promise<void>;
+  onUpdateTracking: (orderItemId: number, trackingNumber: string, trackingUrl?: string) => Promise<void>;
+  // Returns
+  returns: SupplierReturnRequest[];
+  isLoadingReturns: boolean;
+  onApproveReturn: (returnId: number, notes?: string) => Promise<void>;
+  onRejectReturn: (returnId: number, rejectionReason: string) => Promise<void>;
+  // Payouts
+  payments: SupplierPayment[];
+  isLoadingPayments: boolean;
   // Profile
   isEditingProfile: boolean;
   profileForm: {
@@ -190,6 +215,7 @@ export const useDashboardProps = (props: {
   const productTabProps: ProductTabProps = {
     products: props.products,
     isLoadingProducts: props.isLoadingProducts,
+    onProductsRefresh: props.onProductsRefresh,
     categories: props.categories,
     brands: props.brands,
     isAddProductOpen: props.isAddProductOpen,
@@ -234,14 +260,22 @@ export const useDashboardProps = (props: {
   const orderTabProps: OrderTabProps = {
     orders: props.orders,
     isLoadingOrders: props.isLoadingOrders,
-    isShipOrderOpen: props.isShipOrderOpen,
-    selectedOrderItemId: props.selectedOrderItemId,
-    selectedOrderId: props.selectedOrderId,
-    trackingNumber: props.trackingNumber,
+    onConfirmOrderItem: props.onConfirmOrderItem,
     onShipOrder: props.onShipOrder,
-    onTrackingNumberChange: props.onTrackingNumberChange,
-    onShipOrderDialogChange: props.onShipOrderOpenChange,
+    onUpdateTracking: props.onUpdateTracking,
     getStatusBadge: props.getStatusBadge,
+  };
+
+  const returnsTabProps: ReturnsTabProps = {
+    returns: props.returns,
+    isLoadingReturns: props.isLoadingReturns,
+    onApproveReturn: props.onApproveReturn,
+    onRejectReturn: props.onRejectReturn,
+  };
+
+  const payoutsTabProps: PayoutsTabProps = {
+    payments: props.payments,
+    isLoadingPayments: props.isLoadingPayments,
   };
 
   const profileTabProps: ProfileTabProps = {
@@ -253,11 +287,14 @@ export const useDashboardProps = (props: {
     onCancelEdit: props.onCancelEdit,
     onUpdateProfile: props.onUpdateProfile,
     onProfileFormChange: props.onProfileFormChange,
+    onProfileRefresh: props.onProfileRefresh,
   };
 
   return {
     productTabProps,
     orderTabProps,
+    returnsTabProps,
+    payoutsTabProps,
     profileTabProps,
   };
 };

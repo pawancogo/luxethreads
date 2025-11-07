@@ -4,7 +4,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { X } from 'lucide-react';
-import { categories, fabrics, colors, sizes } from '@/data/mockProducts';
+// Note: Fabrics, colors, and sizes should come from attribute_types API
+// For now, using static arrays - these should be fetched from backend
+const fabrics = ['cotton', 'silk', 'linen'];
+const colors = ['Red', 'Blue', 'Green', 'Yellow', 'Black', 'White', 'Pink', 'Purple'];
+const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
 interface ProductsFiltersProps {
   showFilters: boolean;

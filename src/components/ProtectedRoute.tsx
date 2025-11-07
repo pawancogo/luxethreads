@@ -26,6 +26,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
+    // Clear all authentication data when user is not available
+    localStorage.removeItem('user');
+    localStorage.removeItem('auth_token');
+    
+    // Clear specific auth cookies
+    document.cookie = 'authtoken=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+    
+    // Clear all other cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
     return <Navigate to={redirectTo} replace />;
   }
 

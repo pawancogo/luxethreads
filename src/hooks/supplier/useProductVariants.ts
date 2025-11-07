@@ -21,6 +21,9 @@ interface UseProductVariantsReturn {
   updateImageUrl: (variantIndex: number, imageIndex: number, value: string) => void;
   resetVariants: () => void;
   createAllVariants: (productId: number) => Promise<void>;
+  createVariant: (productId: number, variantData: any) => Promise<void>;
+  editVariant: (productId: number, variantId: number, data: any) => Promise<void>;
+  deleteVariant: (productId: number, variantId: number) => Promise<void>;
 }
 
 const initialVariant: ProductVariantForm = {
@@ -125,6 +128,73 @@ export const useProductVariants = (): UseProductVariantsReturn => {
     }
   };
 
+  const createVariant = async (productId: number, variantData: {
+    price: number;
+    discounted_price?: number;
+    stock_quantity: number;
+    weight_kg?: number;
+    image_urls?: string[];
+    attribute_value_ids?: number[];
+  }): Promise<void> => {
+    try {
+      await productsAPI.createVariant(productId, variantData);
+      toast({
+        title: 'Success',
+        description: 'Variant created successfully',
+      });
+    } catch (error: any) {
+      const errorMessage = error?.errors?.[0] || error?.message || 'Failed to create variant';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const editVariant = async (productId: number, variantId: number, data: {
+    price: number;
+    discounted_price?: number;
+    stock_quantity: number;
+    weight_kg?: number;
+    image_urls?: string[];
+  }): Promise<void> => {
+    try {
+      await productsAPI.updateVariant(productId, variantId, data);
+      toast({
+        title: 'Success',
+        description: 'Variant updated successfully',
+      });
+    } catch (error: any) {
+      const errorMessage = error?.errors?.[0] || error?.message || 'Failed to update variant';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const deleteVariant = async (productId: number, variantId: number): Promise<void> => {
+    try {
+      await productsAPI.deleteVariant(productId, variantId);
+      toast({
+        title: 'Success',
+        description: 'Variant deleted successfully',
+      });
+    } catch (error: any) {
+      const errorMessage = error?.errors?.[0] || error?.message || 'Failed to delete variant';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   return {
     variants,
     addVariant,
@@ -135,6 +205,9 @@ export const useProductVariants = (): UseProductVariantsReturn => {
     updateImageUrl,
     resetVariants,
     createAllVariants,
+    createVariant,
+    editVariant,
+    deleteVariant,
   };
 };
 

@@ -9,6 +9,8 @@ import {
   SupplierProduct,
   SupplierOrder,
   SupplierProfile,
+  SupplierReturnRequest,
+  SupplierPayment,
   Category,
   Brand,
   ProductVariantForm,
@@ -18,6 +20,7 @@ interface SupplierDashboardViewProps {
   // Data
   products: SupplierProduct[];
   orders: SupplierOrder[];
+  onProductsRefresh?: () => void;
   profile: SupplierProfile | null;
   categories: Category[];
   brands: Brand[];
@@ -89,14 +92,18 @@ interface SupplierDashboardViewProps {
     image_urls?: string[];
   }) => Promise<void>;
   onDeleteVariant?: (productId: number, variantId: number) => Promise<void>;
-  // Ship order
-  isShipOrderOpen: boolean;
-  selectedOrderItemId: number | null;
-  selectedOrderId: number | null;
-  trackingNumber: string;
-  onTrackingNumberChange: (value: string) => void;
-  onShipOrderOpenChange: (open: boolean, orderItemId?: number, orderId?: number) => void;
-  onShipOrder: () => void;
+  // Order actions
+  onConfirmOrderItem: (orderItemId: number) => Promise<void>;
+  onShipOrder: (orderItemId: number, trackingNumber: string) => Promise<void>;
+  onUpdateTracking: (orderItemId: number, trackingNumber: string, trackingUrl?: string) => Promise<void>;
+  // Returns
+  returns: SupplierReturnRequest[];
+  isLoadingReturns: boolean;
+  onApproveReturn: (returnId: number, notes?: string) => Promise<void>;
+  onRejectReturn: (returnId: number, rejectionReason: string) => Promise<void>;
+  // Payouts
+  payments: SupplierPayment[];
+  isLoadingPayments: boolean;
   // Profile
   isEditingProfile: boolean;
   profileForm: {
@@ -109,6 +116,7 @@ interface SupplierDashboardViewProps {
   onEditProfile: () => void;
   onCancelEdit: () => void;
   onUpdateProfile: () => void;
+  onProfileRefresh?: () => void;
   // Utility functions
   getStatusBadge: (status: string) => React.ReactNode;
   getProductMinPrice: (product: SupplierProduct) => string;
@@ -123,7 +131,7 @@ const SupplierDashboardView: React.FC<SupplierDashboardViewProps> = (props) => {
   }
 
   // Group props by functionality using hook
-  const { productTabProps, orderTabProps, profileTabProps } = useDashboardProps({
+  const { productTabProps, orderTabProps, returnsTabProps, payoutsTabProps, profileTabProps } = useDashboardProps({
     ...props,
     getStatusBadge: props.getStatusBadge,
     getProductMinPrice: props.getProductMinPrice,
@@ -138,6 +146,8 @@ const SupplierDashboardView: React.FC<SupplierDashboardViewProps> = (props) => {
         <DashboardTabs
           productTabProps={productTabProps}
           orderTabProps={orderTabProps}
+          returnsTabProps={returnsTabProps}
+          payoutsTabProps={payoutsTabProps}
           profileTabProps={profileTabProps}
         />
       </div>

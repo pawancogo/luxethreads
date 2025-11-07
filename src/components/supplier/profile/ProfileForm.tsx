@@ -73,6 +73,9 @@ const ProfileForm: React.FC<ProfileFormProps> = ({
           </Button>
         )}
       </div>
+      <p className="text-xs text-gray-500 mt-2">
+        Note: Supplier tier and other advanced settings are managed by administrators.
+      </p>
     </div>
   );
 };

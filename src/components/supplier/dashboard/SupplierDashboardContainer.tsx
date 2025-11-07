@@ -4,6 +4,8 @@ import { useStatusBadge } from '@/hooks/supplier/useStatusBadge';
 import { useProductUtils } from '@/hooks/supplier/useProductUtils';
 import { useSupplierProducts } from '@/hooks/supplier/useSupplierProducts';
 import { useSupplierOrders } from '@/hooks/supplier/useSupplierOrders';
+import { useSupplierReturns } from '@/hooks/supplier/useSupplierReturns';
+import { useSupplierPayments } from '@/hooks/supplier/useSupplierPayments';
 import { useSupplierProfile } from '@/hooks/supplier/useSupplierProfile';
 import { useCategoriesAndBrands } from '@/hooks/supplier/useCategoriesAndBrands';
 import { useProductVariants } from '@/hooks/supplier/useProductVariants';
@@ -18,6 +20,8 @@ const SupplierDashboardContainer: React.FC = () => {
   // Data hooks - MUST be called before any early returns to follow Rules of Hooks
   const productsHook = useSupplierProducts();
   const ordersHook = useSupplierOrders();
+  const returnsHook = useSupplierReturns();
+  const paymentsHook = useSupplierPayments();
   const profileHook = useSupplierProfile();
   const { categories, brands, isLoadingCategories, isLoadingBrands } = useCategoriesAndBrands();
 
@@ -83,13 +87,7 @@ const SupplierDashboardContainer: React.FC = () => {
     newVariantForm.setValue('image_urls', updated);
   };
 
-  // Ship order dialog
-  const shipOrderDialog = useDialog();
-  const [selectedOrderItemId, setSelectedOrderItemId] = useState<number | null>(null);
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-  const trackingForm = useForm({
-    tracking_number: '',
-  });
+  // Order action handlers (no dialog state needed - handled in OrderActions component)
 
   // Profile form
   const profileForm = useForm({
@@ -104,22 +102,42 @@ const SupplierDashboardContainer: React.FC = () => {
   const { getStatusBadge } = useStatusBadge();
   const { getProductMinPrice, getProductTotalStock } = useProductUtils();
 
+  // Helper function to clear all authentication data
+  const clearAuthData = () => {
+    // Clear localStorage
+    localStorage.removeItem('user');
+    localStorage.removeItem('auth_token');
+    
+    // Clear specific auth cookies
+    document.cookie = 'authtoken=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+    
+    // Clear all other cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+  };
+
   // Early return if user is not loaded or not a supplier (AFTER all hooks)
   if (!user) {
+    // Clear all authentication data and redirect to login
+    clearAuthData();
+    window.location.href = '/auth';
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="text-center text-gray-600">Loading...</div>
+        <div className="text-center text-gray-600">Redirecting to login...</div>
       </div>
     );
   }
 
   if (user.role !== 'supplier') {
+    // Clear all authentication data and redirect to login for non-suppliers
+    clearAuthData();
+    window.location.href = '/auth';
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="text-center text-gray-600">
-          <p className="text-lg font-semibold mb-2">Access Denied</p>
-          <p>You must be a supplier to access this page.</p>
-        </div>
+        <div className="text-center text-gray-600">Redirecting to login...</div>
       </div>
     );
   }
@@ -208,11 +226,6 @@ const SupplierDashboardContainer: React.FC = () => {
 
   const handleCreateVariant = async () => {
     if (!selectedProductId || !newVariantForm.values.price || !newVariantForm.values.stock_quantity) {
-      console.error('Missing required fields:', {
-        selectedProductId,
-        price: newVariantForm.values.price,
-        stock_quantity: newVariantForm.values.stock_quantity
-      });
       return;
     }
 
@@ -239,16 +252,13 @@ const SupplierDashboardContainer: React.FC = () => {
         attribute_value_ids: attributeValueIds.length > 0 ? attributeValueIds : undefined,
       };
       
-      console.log('Creating variant with payload:', payload);
-      
       await productsAPI.createVariant(selectedProductId, payload);
       addVariantDialog.close();
       newVariantForm.reset();
       setSelectedProductId(null);
       await productsHook.refetch();
     } catch (error: any) {
-      console.error('Failed to create variant:', error);
-      // Show error message to user
+      // Error is handled in the hook
     }
   };
 
@@ -275,21 +285,17 @@ const SupplierDashboardContainer: React.FC = () => {
     }
   };
 
-  const handleShipOrder = async () => {
-    const currentOrderItemId = selectedOrderItemId;
-    const trackingNum = trackingForm.values.tracking_number;
-    
-    if (!currentOrderItemId || !trackingNum) return;
-    
-    try {
-      await ordersHook.shipOrder(currentOrderItemId, trackingNum);
-      shipOrderDialog.close();
-      trackingForm.reset();
-      setSelectedOrderItemId(null);
-      setSelectedOrderId(null);
-    } catch (error) {
-      // Error is handled in the hook
-    }
+  // Order action handlers - delegate to hook methods
+  const handleConfirmOrderItem = async (orderItemId: number) => {
+    await ordersHook.confirmOrderItem(orderItemId);
+  };
+
+  const handleShipOrder = async (orderItemId: number, trackingNumber: string) => {
+    await ordersHook.shipOrder(orderItemId, trackingNumber);
+  };
+
+  const handleUpdateTracking = async (orderItemId: number, trackingNumber: string, trackingUrl?: string) => {
+    await ordersHook.updateTracking(orderItemId, trackingNumber, trackingUrl);
   };
 
   const handleEditProfile = () => {
@@ -331,6 +337,7 @@ const SupplierDashboardContainer: React.FC = () => {
       // Data
       products={productsHook.products}
       orders={ordersHook.orders}
+      onProductsRefresh={productsHook.refetch}
       profile={profileHook.profile}
       categories={categories}
       brands={brands}
@@ -406,24 +413,18 @@ const SupplierDashboardContainer: React.FC = () => {
       onCreateVariant={handleCreateVariant}
       onEditVariant={handleUpdateVariant}
       onDeleteVariant={handleDeleteVariant}
-      // Ship order
-      isShipOrderOpen={shipOrderDialog.isOpen}
-      selectedOrderItemId={selectedOrderItemId}
-      selectedOrderId={selectedOrderId}
-      trackingNumber={trackingForm.values.tracking_number}
-      onTrackingNumberChange={(value) => trackingForm.setValue('tracking_number', value)}
-      onShipOrderOpenChange={(open, orderItemId, orderId) => {
-        if (open) {
-          setSelectedOrderItemId(orderItemId || null);
-          setSelectedOrderId(orderId || null);
-          shipOrderDialog.open();
-        } else {
-          shipOrderDialog.close();
-          setSelectedOrderItemId(null);
-          setSelectedOrderId(null);
-        }
-      }}
+      // Order actions
+      onConfirmOrderItem={handleConfirmOrderItem}
       onShipOrder={handleShipOrder}
+      onUpdateTracking={handleUpdateTracking}
+      // Returns
+      returns={returnsHook.returns}
+      isLoadingReturns={returnsHook.isLoading}
+      onApproveReturn={returnsHook.approveReturn}
+      onRejectReturn={returnsHook.rejectReturn}
+      // Payouts
+      payments={paymentsHook.payments}
+      isLoadingPayments={paymentsHook.isLoading}
       // Profile
       isEditingProfile={isEditingProfile}
       profileForm={profileForm.values}
@@ -431,6 +432,7 @@ const SupplierDashboardContainer: React.FC = () => {
       onEditProfile={handleEditProfile}
       onCancelEdit={handleCancelProfileEdit}
       onUpdateProfile={handleUpdateProfile}
+      onProfileRefresh={profileHook.refetch}
       // Utility functions - extracted to hooks
       getStatusBadge={getStatusBadge}
       getProductMinPrice={getProductMinPrice}

@@ -15,15 +15,21 @@ const FeaturedProducts = () => {
     const loadFeaturedProducts = async () => {
       try {
         setIsLoading(true);
-        const response = await productsAPI.getPublicProducts(1, 4);
+        // Phase 2: Use object parameters with featured filter
+        const response = await productsAPI.getPublicProducts({
+          page: 1,
+          per_page: 4,
+          featured: true
+        });
         
-        // API interceptor extracts data, so response is already the array/object
-        // Backend returns array of products directly after interceptor
-        const products = Array.isArray(response) ? response : ((response as any)?.products || []);
+        // API interceptor extracts data, so response is the data object
+        // Backend returns: { products: [...], pagination: {...}, ... }
+        const products = Array.isArray(response) 
+          ? response 
+          : ((response as any)?.products || []);
         const mappedProducts = products.map(mapBackendProductToList);
         setFeaturedProducts(mappedProducts);
       } catch (error) {
-        console.error('Error loading featured products:', error);
         setFeaturedProducts([]);
       } finally {
         setIsLoading(false);

@@ -1,23 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '@/contexts/CartContext';
 import { Badge } from '@/components/ui/badge';
 import { Heart, Star } from 'lucide-react';
+import { ProductBadges } from '@/components/products/ProductBadges';
 
 interface ProductCardProps {
-  product: Product;
+  product: Product & {
+    slug?: string;
+    is_featured?: boolean;
+    is_bestseller?: boolean;
+    is_new_arrival?: boolean;
+    is_trending?: boolean;
+    stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
+  };
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+const ProductCard: React.FC<ProductCardProps> = memo(({ product }) => {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const discountPercentage = product.originalPrice 
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0;
+  const discountPercentage = useMemo(() => 
+    product.originalPrice 
+      ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+      : 0,
+    [product.originalPrice, product.price]
+  );
 
   const rating = 4.2; // Mock rating
-  const ratingCount = Math.floor(Math.random() * 1000) + 100; // Mock rating count
+  const ratingCount = useMemo(() => Math.floor(Math.random() * 1000) + 100, []);
 
   return (
     <div className="group relative bg-white border border-gray-200 rounded-md overflow-hidden hover:shadow-lg transition-all duration-300">
@@ -34,9 +45,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         />
       </button>
 
-      <Link to={`/product/${product.id}`} className="block">
+      <Link to={`/product/${product.slug || product.id}`} className="block">
         {/* Product Image */}
-        <div className="aspect-[3/4] bg-gray-100 overflow-hidden">
+        <div className="aspect-[3/4] bg-gray-100 overflow-hidden relative">
           <img
             src={product.image}
             alt={product.name}
@@ -49,9 +60,20 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             <div className="absolute inset-0 bg-gray-200 animate-pulse" />
           )}
           
+          {/* Phase 2: Product Badges */}
+          <div className="absolute top-2 left-2 z-10">
+            <ProductBadges
+              is_featured={product.is_featured}
+              is_bestseller={product.is_bestseller}
+              is_new_arrival={product.is_new_arrival}
+              is_trending={product.is_trending}
+              stockStatus={product.stockStatus}
+            />
+          </div>
+          
           {/* Discount Badge */}
           {discountPercentage > 0 && (
-            <Badge className="absolute top-2 left-2 bg-red-500 text-white text-xs font-medium px-2 py-1">
+            <Badge className="absolute top-2 right-2 bg-red-500 text-white text-xs font-medium px-2 py-1 z-10">
               {discountPercentage}% OFF
             </Badge>
           )}
@@ -148,6 +170,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       </Link>
     </div>
   );
-};
+});
+
+ProductCard.displayName = 'ProductCard';
 
 export default ProductCard;

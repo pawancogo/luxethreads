@@ -2,32 +2,32 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { SupplierOrder } from '../types';
-import ShipOrderDialog from './ShipOrderDialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, Clock } from 'lucide-react';
+import { SupplierOrder, OrderItem } from '../types';
+import OrderActions from './OrderActions';
 
 interface OrderCardProps {
   order: SupplierOrder;
-  isShipOrderOpen: boolean;
-  selectedOrderItemId: number | null;
-  selectedOrderId: number | null;
-  trackingNumber: string;
-  onShipOrder: () => void;
-  onTrackingNumberChange: (value: string) => void;
-  onShipOrderDialogChange: (open: boolean, orderItemId?: number, orderId?: number) => void;
+  onConfirmOrderItem: (orderItemId: number) => Promise<void>;
+  onShipOrder: (orderItemId: number, trackingNumber: string) => Promise<void>;
+  onUpdateTracking: (orderItemId: number, trackingNumber: string, trackingUrl?: string) => Promise<void>;
   getStatusBadge: (status: string) => React.ReactNode;
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({
   order,
-  isShipOrderOpen,
-  selectedOrderItemId,
-  selectedOrderId,
-  trackingNumber,
+  onConfirmOrderItem,
   onShipOrder,
-  onTrackingNumberChange,
-  onShipOrderDialogChange,
+  onUpdateTracking,
   getStatusBadge,
 }) => {
+  const [isStatusHistoryOpen, setIsStatusHistoryOpen] = React.useState(false);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -35,15 +35,52 @@ const OrderCard: React.FC<OrderCardProps> = ({
           <div>
             <CardTitle className="text-lg">Order #{order.order_number}</CardTitle>
             <CardDescription>
-              {new Date(order.order_date).toLocaleDateString()} - {order.customer_name} (
-              {order.customer_email})
+              {formatDate(order.order_date)} - {order.customer_name} ({order.customer_email})
             </CardDescription>
+            {order.tracking_number && (
+              <div className="mt-2 text-sm">
+                <span className="text-gray-500">Tracking: </span>
+                {order.tracking_url ? (
+                  <a
+                    href={order.tracking_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    {order.tracking_number}
+                  </a>
+                ) : (
+                  <span className="font-medium">{order.tracking_number}</span>
+                )}
+              </div>
+            )}
           </div>
           <div className="text-right">
             <div className="font-semibold">${order.total_amount.toFixed(2)}</div>
             <div className="text-sm text-gray-500">{getStatusBadge(order.status)}</div>
           </div>
         </div>
+        {order.status_history && order.status_history.length > 0 && (
+          <Collapsible open={isStatusHistoryOpen} onOpenChange={setIsStatusHistoryOpen}>
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mt-2">
+              <Clock className="h-4 w-4" />
+              <span>Status History</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isStatusHistoryOpen ? 'rotate-180' : ''}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="space-y-1 text-sm">
+                {order.status_history.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-2 text-gray-600">
+                    <span className="font-medium capitalize">{entry.status}</span>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-xs">{formatDate(entry.timestamp)}</span>
+                    {entry.note && <span className="text-gray-500">- {entry.note}</span>}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </CardHeader>
       <CardContent>
         <Table>
@@ -54,6 +91,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
               <TableHead>Quantity</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Subtotal</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -66,27 +104,34 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 <TableCell>${item.price_at_purchase.toFixed(2)}</TableCell>
                 <TableCell>${item.subtotal.toFixed(2)}</TableCell>
                 <TableCell>
-                  {order.status === 'paid' && (
-                    <ShipOrderDialog
-                      orderItemId={item.order_item_id}
-                      orderId={order.order_id}
-                      isOpen={
-                        isShipOrderOpen &&
-                        selectedOrderItemId === item.order_item_id &&
-                        selectedOrderId === order.order_id
-                      }
-                      trackingNumber={trackingNumber}
-                      onOpenChange={(open) =>
-                        onShipOrderDialogChange(
-                          open,
-                          open ? item.order_item_id : undefined,
-                          open ? order.order_id : undefined
-                        )
-                      }
-                      onTrackingNumberChange={onTrackingNumberChange}
-                      onShipOrder={onShipOrder}
-                    />
+                  <Badge variant="outline" className="capitalize">
+                    {item.fulfillment_status || 'pending'}
+                  </Badge>
+                  {item.tracking_number && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {item.tracking_url ? (
+                        <a
+                          href={item.tracking_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {item.tracking_number}
+                        </a>
+                      ) : (
+                        item.tracking_number
+                      )}
+                    </div>
                   )}
+                </TableCell>
+                <TableCell>
+                  <OrderActions
+                    orderItem={item}
+                    orderStatus={order.status}
+                    onConfirm={onConfirmOrderItem}
+                    onShip={onShipOrder}
+                    onUpdateTracking={onUpdateTracking}
+                  />
                 </TableCell>
               </TableRow>
             ))}

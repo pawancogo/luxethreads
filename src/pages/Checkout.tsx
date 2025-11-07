@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useUser } from '@/contexts/UserContext';
-import { addressesAPI, ordersAPI } from '@/services/api';
+import { addressesAPI, ordersAPI, couponsAPI } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,8 @@ interface Address {
   state: string;
   postal_code: string;
   country: string;
+  is_default_shipping?: boolean;
+  is_default_billing?: boolean;
 }
 
 const Checkout = () => {
@@ -49,6 +51,10 @@ const Checkout = () => {
 
   const [paymentMethod, setPaymentMethod] = useState('');
   const [shippingMethod, setShippingMethod] = useState('standard');
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   // Load addresses on mount
   useEffect(() => {
@@ -61,12 +67,29 @@ const Checkout = () => {
         const addressList = Array.isArray(response) ? response : [];
         setAddresses(addressList);
         
-        // Auto-select first address if available
+        // Auto-select default shipping address, or first address if no default
         if (addressList.length > 0) {
-          setSelectedShippingAddress(addressList[0].id);
+          const defaultShipping = addressList.find(a => a.is_default_shipping);
+          if (defaultShipping) {
+            setSelectedShippingAddress(defaultShipping.id);
+          } else {
+            setSelectedShippingAddress(addressList[0].id);
+          }
+          
+          // Auto-select default billing address, or 'same' if default shipping is also default billing
+          const defaultBilling = addressList.find(a => a.is_default_billing);
+          if (defaultBilling) {
+            if (defaultShipping && defaultShipping.id === defaultBilling.id) {
+              setSelectedBillingAddress('same');
+            } else {
+              setSelectedBillingAddress(defaultBilling.id);
+            }
+          } else if (defaultShipping) {
+            setSelectedBillingAddress('same');
+          }
         }
       } catch (error) {
-        console.error('Error loading addresses:', error);
+        // Error handled silently
       } finally {
         setIsLoadingAddresses(false);
       }
@@ -98,6 +121,58 @@ const Checkout = () => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast({
+        title: 'Coupon Code Required',
+        description: 'Please enter a coupon code',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    try {
+      // Validate coupon first
+      const validation: any = await couponsAPI.validateCoupon(couponCode.trim());
+      
+      if (validation && (validation.is_valid !== false || validation.code)) {
+        // Apply coupon
+        const result: any = await couponsAPI.applyCoupon(couponCode.trim(), state.total);
+        setAppliedCoupon(result.coupon || validation);
+        setDiscountAmount(result.discount_amount || 0);
+        toast({
+          title: 'Coupon Applied!',
+          description: `You saved ₹${result.discount_amount || 0}`,
+        });
+      } else {
+        toast({
+          title: 'Invalid Coupon',
+          description: validation?.message || 'This coupon code is not valid',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to apply coupon',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setDiscountAmount(0);
+    toast({
+      title: 'Coupon Removed',
+      description: 'Coupon has been removed',
     });
   };
 
@@ -152,7 +227,8 @@ const Checkout = () => {
           postal_code: formData.postal_code,
           country: formData.country,
         });
-        shippingAddressId = (shippingAddress as any).id;
+        // API interceptor already extracts data
+        shippingAddressId = (shippingAddress as any)?.id;
       } else {
         shippingAddressId = selectedShippingAddress;
       }
@@ -173,7 +249,8 @@ const Checkout = () => {
           postal_code: formData.postal_code,
           country: formData.country,
         });
-        billingAddressId = (billingAddress as any).id;
+        // API interceptor already extracts data
+        billingAddressId = (billingAddress as any)?.id;
       } else {
         billingAddressId = selectedBillingAddress;
       }
@@ -184,6 +261,7 @@ const Checkout = () => {
         billing_address_id: billingAddressId,
         shipping_method: shippingMethod,
         payment_method_id: paymentMethod === 'cod' ? undefined : paymentMethod,
+        coupon_code: appliedCoupon ? couponCode.trim() : undefined,
       });
 
       toast({
@@ -213,8 +291,8 @@ const Checkout = () => {
   }
 
   const subtotal = state.total;
-  const tax = Math.round(subtotal * 0.18);
-  const total = subtotal + tax;
+  const tax = Math.round((subtotal - discountAmount) * 0.18);
+  const total = subtotal - discountAmount + tax;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -476,11 +554,67 @@ const Checkout = () => {
                   ))}
                 </div>
 
+                {/* Coupon Code */}
+                <div className="border-t pt-4">
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-md mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-green-700">
+                          {appliedCoupon.code} Applied
+                        </span>
+                        <span className="text-xs text-green-600">
+                          -₹{discountAmount.toLocaleString()}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        className="text-xs text-green-700 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 mb-4">
+                      <Label htmlFor="coupon_code">Promo Code</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="coupon_code"
+                          placeholder="Enter promo code"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleApplyCoupon();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleApplyCoupon}
+                          disabled={isApplyingCoupon || !couponCode.trim()}
+                        >
+                          {isApplyingCoupon ? 'Applying...' : 'Apply'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500">Enter a valid coupon code to get discounts</p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="border-t pt-4 space-y-2">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
                     <span>₹{subtotal.toLocaleString()}</span>
                   </div>
+                  {appliedCoupon && discountAmount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount ({appliedCoupon.code})</span>
+                      <span>-₹{discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span>Shipping</span>
                     <span className="text-green-600">Free</span>

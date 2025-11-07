@@ -1,17 +1,25 @@
 import { Product } from '@/contexts/CartContext';
 
-// Backend API Product Response Types
+// Phase 2: Enhanced Backend API Product Response Types
 interface BackendProduct {
   id: number;
+  slug?: string;
   name: string;
   description: string;
+  short_description?: string;
   brand_name: string;
   category_name: string;
   supplier_name: string;
   price: number;
   discounted_price?: number;
+  base_price?: number;
+  base_discounted_price?: number;
   image_url?: string;
   stock_available: boolean;
+  is_featured?: boolean;
+  is_bestseller?: boolean;
+  is_new_arrival?: boolean;
+  is_trending?: boolean;
   average_rating?: number;
 }
 
@@ -99,21 +107,40 @@ function extractSizes(variants: BackendProductVariant[]): string[] {
 
 /**
  * Map backend product (from list/search) to frontend Product type
+ * Phase 2: Enhanced with Phase 2 fields
  */
-export function mapBackendProductToList(backendProduct: BackendProduct): Product {
+export function mapBackendProductToList(backendProduct: BackendProduct): Product & {
+  slug?: string;
+  is_featured?: boolean;
+  is_bestseller?: boolean;
+  is_new_arrival?: boolean;
+  is_trending?: boolean;
+  stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
+} {
+  // Determine stock status
+  const stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock' = 
+    backendProduct.stock_available ? 'in_stock' : 'out_of_stock';
+  
   return {
     id: backendProduct.id.toString(),
+    slug: backendProduct.slug,
     name: backendProduct.name,
-    price: backendProduct.discounted_price || backendProduct.price,
-    originalPrice: backendProduct.discounted_price ? backendProduct.price : undefined,
+    price: backendProduct.discounted_price || backendProduct.base_discounted_price || backendProduct.price || backendProduct.base_price || 0,
+    originalPrice: backendProduct.discounted_price ? backendProduct.price : (backendProduct.base_discounted_price ? backendProduct.base_price : undefined),
     image: backendProduct.image_url || '',
     category: backendProduct.category_name.toLowerCase(),
     fabric: '', // Not available in list view
     colors: [], // Not available in list view
     sizes: [], // Not available in list view
-    description: backendProduct.description || '',
+    description: backendProduct.short_description || backendProduct.description || '',
     inStock: backendProduct.stock_available,
-    featured: false,
+    featured: backendProduct.is_featured || false,
+    // Phase 2: Additional fields
+    is_featured: backendProduct.is_featured,
+    is_bestseller: backendProduct.is_bestseller,
+    is_new_arrival: backendProduct.is_new_arrival,
+    is_trending: backendProduct.is_trending,
+    stockStatus,
   };
 }
 

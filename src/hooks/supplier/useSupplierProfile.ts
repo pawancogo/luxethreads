@@ -33,8 +33,8 @@ export const useSupplierProfile = (): UseSupplierProfileReturn => {
       setIsLoading(true);
       setError(null);
       const response = await supplierProfileAPI.getProfile();
-      // Handle both direct object and axios response structure
-      const profileData = response?.data?.data || response?.data || response;
+      // API interceptor already extracts data, so response is the data directly
+      const profileData = response || {};
       setProfile(profileData as unknown as SupplierProfile);
     } catch (err: any) {
       // Profile might not exist yet, that's okay

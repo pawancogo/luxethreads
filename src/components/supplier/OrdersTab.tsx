@@ -7,26 +7,18 @@ import OrderCard from './orders/OrderCard';
 interface OrdersTabProps {
   orders: SupplierOrder[];
   isLoadingOrders: boolean;
-  isShipOrderOpen: boolean;
-  selectedOrderItemId: number | null;
-  selectedOrderId: number | null;
-  trackingNumber: string;
-  onShipOrder: () => void;
-  onTrackingNumberChange: (value: string) => void;
-  onShipOrderDialogChange: (open: boolean, orderItemId?: number, orderId?: number) => void;
+  onConfirmOrderItem: (orderItemId: number) => Promise<void>;
+  onShipOrder: (orderItemId: number, trackingNumber: string) => Promise<void>;
+  onUpdateTracking: (orderItemId: number, trackingNumber: string, trackingUrl?: string) => Promise<void>;
   getStatusBadge: (status: string) => React.ReactNode;
 }
 
 const OrdersTab: React.FC<OrdersTabProps> = ({
   orders,
   isLoadingOrders,
-  isShipOrderOpen,
-  selectedOrderItemId,
-  selectedOrderId,
-  trackingNumber,
+  onConfirmOrderItem,
   onShipOrder,
-  onTrackingNumberChange,
-  onShipOrderDialogChange,
+  onUpdateTracking,
   getStatusBadge,
 }) => {
   return (
@@ -48,13 +40,9 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
               <OrderCard
                 key={order.order_id}
                 order={order}
-                isShipOrderOpen={isShipOrderOpen}
-                selectedOrderItemId={selectedOrderItemId}
-                selectedOrderId={selectedOrderId}
-                trackingNumber={trackingNumber}
+                onConfirmOrderItem={onConfirmOrderItem}
                 onShipOrder={onShipOrder}
-                onTrackingNumberChange={onTrackingNumberChange}
-                onShipOrderDialogChange={onShipOrderDialogChange}
+                onUpdateTracking={onUpdateTracking}
                 getStatusBadge={getStatusBadge}
               />
             ))}

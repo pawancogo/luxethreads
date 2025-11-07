@@ -53,17 +53,51 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile }) => {
           </p>
         </div>
       </div>
-      {profile.verified ? (
-        <div className="flex items-center gap-2">
-          <Badge variant="default">Verified</Badge>
-          <span className="text-sm text-gray-500">Your profile has been verified by admin</span>
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <Label className="text-sm font-medium text-gray-500">Verification Status</Label>
+          <div className="mt-1">
+            {profile.verified ? (
+              <Badge variant="default">Verified</Badge>
+            ) : (
+              <Badge variant="secondary">Pending Verification</Badge>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">Pending Verification</Badge>
-          <span className="text-sm text-gray-500">Your profile is awaiting admin verification</span>
+        {profile.supplier_tier && (
+          <div>
+            <Label className="text-sm font-medium text-gray-500">Supplier Tier</Label>
+            <div className="mt-1">
+              <Badge variant="outline" className="capitalize">
+                {profile.supplier_tier}
+              </Badge>
+            </div>
+          </div>
+        )}
+      </div>
+      {profile.is_suspended && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">
+            <strong>Account Suspended:</strong> Your supplier account has been suspended. Please contact support.
+          </p>
         </div>
       )}
+      {profile.contact_email || profile.contact_phone ? (
+        <div className="grid grid-cols-2 gap-6 mt-4">
+          {profile.contact_email && (
+            <div>
+              <Label className="text-sm font-medium text-gray-500">Contact Email</Label>
+              <p className="mt-1 text-gray-700">{profile.contact_email}</p>
+            </div>
+          )}
+          {profile.contact_phone && (
+            <div>
+              <Label className="text-sm font-medium text-gray-500">Contact Phone</Label>
+              <p className="mt-1 text-gray-700">{profile.contact_phone}</p>
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 };

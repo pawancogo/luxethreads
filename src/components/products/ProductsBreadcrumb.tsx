@@ -1,5 +1,5 @@
 import React from 'react';
-import { categories } from '@/data/mockProducts';
+import { useProduct } from '@/contexts/ProductContext';
 
 interface ProductsBreadcrumbProps {
   selectedCategory: string;
@@ -10,11 +10,16 @@ const ProductsBreadcrumb: React.FC<ProductsBreadcrumbProps> = ({
   selectedCategory,
   searchQuery
 }) => {
+  const { categories } = useProduct();
+  const categoryName = selectedCategory !== 'all' 
+    ? categories.find(c => c.id.toString() === selectedCategory || c.slug === selectedCategory)?.name
+    : null;
+  
   return (
     <div className="border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="text-sm text-gray-500">
-          Home / Clothing {selectedCategory !== 'all' && `/ ${categories.find(c => c.id === selectedCategory)?.name}`}
+          Home / Clothing {categoryName && `/ ${categoryName}`}
         </div>
         {searchQuery && (
           <div className="mt-1">

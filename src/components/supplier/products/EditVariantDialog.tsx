@@ -95,10 +95,9 @@ const EditVariantDialog: React.FC<EditVariantDialogProps> = ({
       let data: any[] = [];
       if (Array.isArray(response)) {
         data = response;
-      } else if (response?.data && Array.isArray(response.data)) {
-        data = response.data;
       } else if (typeof response === 'object' && response !== null) {
-        data = (response as any).data || [];
+        // API interceptor already extracts data, so response is the data directly
+        data = [];
       }
       
       const attributeTypesArray: AttributeType[] = Array.isArray(data) ? data : [];

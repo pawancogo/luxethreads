@@ -104,14 +104,24 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                     <User className="h-4 w-4 text-gray-600 mr-3" />
                     <span className="text-sm text-gray-700">My Profile</span>
                   </button>
-                  <button className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-100 transition-colors">
-                    <Package className="h-4 w-4 text-gray-600 mr-3" />
-                    <span className="text-sm text-gray-700">Orders</span>
-                  </button>
-                  <button className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-100 transition-colors">
-                    <Heart className="h-4 w-4 text-gray-600 mr-3" />
-                    <span className="text-sm text-gray-700">Wishlist</span>
-                  </button>
+                  {user.role !== 'supplier' && (
+                    <>
+                      <Link to="/orders" onClick={onClose} className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-100 transition-colors">
+                        <Package className="h-4 w-4 text-gray-600 mr-3" />
+                        <span className="text-sm text-gray-700">Orders</span>
+                      </Link>
+                      <Link to="/wishlist" onClick={onClose} className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-100 transition-colors">
+                        <Heart className="h-4 w-4 text-gray-600 mr-3" />
+                        <span className="text-sm text-gray-700">Wishlist</span>
+                      </Link>
+                    </>
+                  )}
+                  {user.role === 'supplier' && (
+                    <Link to="/supplier" onClick={onClose} className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-100 transition-colors">
+                      <Package className="h-4 w-4 text-gray-600 mr-3" />
+                      <span className="text-sm text-gray-700">Supplier Dashboard</span>
+                    </Link>
+                  )}
                   <button className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-100 transition-colors">
                     <CreditCard className="h-4 w-4 text-gray-600 mr-3" />
                     <span className="text-sm text-gray-700">Payments</span>
@@ -133,12 +143,14 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
               )}
             </div>
           ) : (
-            <Link to="/auth" onClick={onClose}>
-              <Button className="w-full bg-pink-600 hover:bg-pink-700 text-white">
-                <User className="h-4 w-4 mr-2" />
-                Sign In
-              </Button>
-            </Link>
+            <div className="space-y-2">
+              <Link to="/auth" onClick={onClose}>
+                <Button className="w-full bg-pink-600 hover:bg-pink-700 text-white">
+                  <User className="h-4 w-4 mr-2" />
+                  Login
+                </Button>
+              </Link>
+            </div>
           )}
         </div>
       </div>

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useUser } from '@/contexts/UserContext';
+import { categoriesAPI } from '@/services/api';
 
 import NavLogo from './navbar/NavLogo';
 import DesktopNavigation from './navbar/DesktopNavigation';
@@ -9,12 +10,22 @@ import SearchBar from './navbar/SearchBar';
 import NavActions from './navbar/NavActions';
 import MobileMenuButton from './navbar/MobileMenuButton';
 import MobileMenu from './navbar/MobileMenu';
-import { navItems } from '@/data/navItems';
+
+interface NavItem {
+  id: string;
+  name: string;
+  subcategories: Array<{
+    title: string;
+    items: string[];
+  }>;
+}
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFallback, setShowFallback] = useState(false);
+  const [navItems, setNavItems] = useState<NavItem[]>([]);
+  const [isLoadingNav, setIsLoadingNav] = useState(true);
   const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -37,6 +48,27 @@ const Navbar = () => {
     navigate(categoryId === 'all' ? '/products' : `/products?${queryString}`);
     setIsMenuOpen(false);
   };
+
+  // Fetch navigation items from backend
+  useEffect(() => {
+    const loadNavigation = async () => {
+      try {
+        setIsLoadingNav(true);
+        const response = await categoriesAPI.getNavigation();
+        // API interceptor already extracts data, so response is the data directly
+        const navigationData = Array.isArray(response) ? response : [];
+        setNavItems(navigationData as NavItem[]);
+      } catch (error) {
+        console.error('Failed to load navigation items:', error);
+        // Fallback to empty array if API fails
+        setNavItems([]);
+      } finally {
+        setIsLoadingNav(false);
+      }
+    };
+
+    loadNavigation();
+  }, []);
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">

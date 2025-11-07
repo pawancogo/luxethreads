@@ -8,7 +8,9 @@ interface UseSupplierOrdersReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
-  shipOrder: (orderId: number, trackingNumber: string) => Promise<void>;
+  confirmOrderItem: (orderItemId: number) => Promise<void>;
+  shipOrder: (orderItemId: number, trackingNumber: string) => Promise<void>;
+  updateTracking: (orderItemId: number, trackingNumber: string, trackingUrl?: string) => Promise<void>;
 }
 
 export const useSupplierOrders = (): UseSupplierOrdersReturn => {
@@ -22,14 +24,8 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
       setIsLoading(true);
       setError(null);
       const response = await supplierOrdersAPI.getSupplierOrders();
-      // Handle both direct array and axios response structure
-      const orders = Array.isArray(response) 
-        ? response 
-        : Array.isArray(response?.data) 
-        ? response.data 
-        : Array.isArray(response?.data?.data)
-        ? response.data.data
-        : [];
+      // API interceptor already extracts data, so response is the data directly
+      const orders = Array.isArray(response) ? response : [];
       setOrders(orders);
     } catch (err: any) {
       const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load orders';
@@ -41,6 +37,25 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const confirmOrderItem = async (orderItemId: number): Promise<void> => {
+    try {
+      await supplierOrdersAPI.confirmOrderItem(orderItemId);
+      toast({
+        title: 'Success',
+        description: 'Order item confirmed successfully',
+      });
+      await loadOrders();
+    } catch (err: any) {
+      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to confirm order';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      throw err;
     }
   };
 
@@ -63,6 +78,25 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
     }
   };
 
+  const updateTracking = async (orderItemId: number, trackingNumber: string, trackingUrl?: string): Promise<void> => {
+    try {
+      await supplierOrdersAPI.updateTracking(orderItemId, trackingNumber, trackingUrl);
+      toast({
+        title: 'Success',
+        description: 'Tracking information updated successfully',
+      });
+      await loadOrders();
+    } catch (err: any) {
+      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to update tracking';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      throw err;
+    }
+  };
+
   useEffect(() => {
     loadOrders();
   }, []);
@@ -72,7 +106,9 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
     isLoading,
     error,
     refetch: loadOrders,
+    confirmOrderItem,
     shipOrder,
+    updateTracking,
   };
 };
 
