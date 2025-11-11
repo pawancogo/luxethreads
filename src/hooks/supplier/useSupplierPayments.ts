@@ -1,6 +1,12 @@
+/**
+ * useSupplierPayments Hook - Clean Architecture Implementation
+ * Uses SupplierService for business logic
+ * Follows: UI → Logic (SupplierService) → Data (API Services)
+ */
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { supplierPaymentsAPI } from '@/services/api';
+import { supplierService } from '@/services/supplier.service';
 import { SupplierPayment } from '@/components/supplier/types';
 
 interface UseSupplierPaymentsReturn {
@@ -21,12 +27,10 @@ export const useSupplierPayments = (): UseSupplierPaymentsReturn => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await supplierPaymentsAPI.getSupplierPayments();
-      // API interceptor already extracts data, so response is the data directly
-      const paymentsData = Array.isArray(response) ? response : [];
-      setPayments(paymentsData);
+      const paymentsList = await supplierService.getPayments();
+      setPayments(paymentsList);
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load payments';
+      const errorMessage = supplierService.extractErrorMessage(err);
       setError(errorMessage);
       toast({
         title: 'Error',
@@ -40,10 +44,9 @@ export const useSupplierPayments = (): UseSupplierPaymentsReturn => {
 
   const getPayment = async (paymentId: number): Promise<SupplierPayment | null> => {
     try {
-      const response = await supplierPaymentsAPI.getSupplierPayment(paymentId);
-      return response as SupplierPayment;
+      return await supplierService.getPayment(paymentId);
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load payment details';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -55,6 +58,7 @@ export const useSupplierPayments = (): UseSupplierPaymentsReturn => {
 
   useEffect(() => {
     loadPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/stores/userStore';
 import StatsCards from '../StatsCards';
 import DashboardHeader from './DashboardHeader';
 import DashboardTabs from './DashboardTabs';

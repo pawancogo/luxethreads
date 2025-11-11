@@ -1,4 +1,4 @@
-import { useRbac } from '@/contexts/RbacContext';
+import { useRbac } from '@/stores/rbacStore';
 
 /**
  * Hook to check if user has a specific permission

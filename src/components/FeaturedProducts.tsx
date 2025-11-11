@@ -1,43 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { productsAPI } from '@/services/api';
+import { useFeaturedProductsQuery } from '@/hooks/useProductsQuery';
 import { mapBackendProductToList } from '@/lib/productMapper';
-import { Product } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 import ProductCard from './ProductCard';
 import { Button } from '@/components/ui/button';
 import ProductSkeleton from './ProductSkeleton';
 
 const FeaturedProducts = () => {
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadFeaturedProducts = async () => {
-      try {
-        setIsLoading(true);
-        // Phase 2: Use object parameters with featured filter
-        const response = await productsAPI.getPublicProducts({
-          page: 1,
-          per_page: 4,
-          featured: true
-        });
-        
-        // API interceptor extracts data, so response is the data object
-        // Backend returns: { products: [...], pagination: {...}, ... }
-        const products = Array.isArray(response) 
-          ? response 
-          : ((response as any)?.products || []);
-        const mappedProducts = products.map(mapBackendProductToList);
-        setFeaturedProducts(mappedProducts);
-      } catch (error) {
-        setFeaturedProducts([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadFeaturedProducts();
-  }, []);
+  // Use React Query hook with caching - prevents duplicate API calls
+  const { data: products = [], isLoading } = useFeaturedProductsQuery(4);
+  
+  const mappedProducts = products.map(mapBackendProductToList);
 
   return (
     <section className="pt-20 pb-10 bg-white">
@@ -56,8 +30,8 @@ const FeaturedProducts = () => {
             Array.from({ length: 4 }).map((_, index) => (
               <ProductSkeleton key={index} />
             ))
-          ) : featuredProducts.length > 0 ? (
-            featuredProducts.map((product) => (
+          ) : mappedProducts.length > 0 ? (
+            mappedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))
           ) : (

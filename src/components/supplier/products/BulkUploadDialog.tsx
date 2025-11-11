@@ -1,4 +1,11 @@
-import React, { useState, useRef } from 'react';
+/**
+ * BulkUploadDialog Component - Clean Architecture Implementation
+ * Uses ProductService for business logic
+ * Removed unnecessary useRef hook
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, FileText, Download, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { productsAPI } from '@/services/api';
+import { supplierService } from '@/services/supplier.service';
 
 interface BulkUploadDialogProps {
   isOpen: boolean;
@@ -27,7 +34,6 @@ const BulkUploadDialog: React.FC<BulkUploadDialogProps> = ({
   onUploadComplete,
 }) => {
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
@@ -73,7 +79,7 @@ const BulkUploadDialog: React.FC<BulkUploadDialogProps> = ({
       const formData = new FormData();
       formData.append('csv_file', selectedFile);
 
-      const response = await productsAPI.bulkUpload(formData);
+      const response = await supplierService.bulkUpload(formData);
       
       setUploadResult(response);
       
@@ -108,16 +114,8 @@ const BulkUploadDialog: React.FC<BulkUploadDialogProps> = ({
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await productsAPI.downloadTemplate();
-      const blob = new Blob([response], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'products_import_template.csv';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const blob = await supplierService.downloadTemplate();
+      supplierService.downloadFile(blob, 'products_import_template.csv');
       
       toast({
         title: 'Template Downloaded',
@@ -136,8 +134,10 @@ const BulkUploadDialog: React.FC<BulkUploadDialogProps> = ({
   const resetDialog = () => {
     setSelectedFile(null);
     setUploadResult(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    // Reset file input by finding it by ID
+    const fileInput = document.getElementById('csv-file') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
     }
   };
 
@@ -183,7 +183,6 @@ const BulkUploadDialog: React.FC<BulkUploadDialogProps> = ({
             <div className="mt-2">
               <Input
                 id="csv-file"
-                ref={fileInputRef}
                 type="file"
                 accept=".csv"
                 onChange={handleFileSelect}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useRbac } from '@/contexts/RbacContext';
+import { useRbac } from '@/stores/rbacStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldX } from 'lucide-react';
 

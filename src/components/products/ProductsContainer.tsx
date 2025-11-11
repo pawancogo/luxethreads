@@ -1,15 +1,18 @@
 /**
- * Products Container Component
- * Handles business logic, data fetching, and state management
- * Follows Container/Presenter pattern - separates logic from UI
+ * Products Container Component - Clean Architecture Implementation
+ * Uses ProductService and CategoryService for business logic
+ * Follows: UI → Logic (Services) → Data (API Services)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { productsAPI, categoriesAPI } from '@/services/api';
-import { mapBackendProductToList } from '@/lib/productMapper';
+import { productService } from '@/services/product.service';
+import { productFilterUtils } from '@/services/product-filter.utils';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { Product } from '@/contexts/CartContext';
+import { useToast } from '@/hooks/use-toast';
+import { getQueryParam, updateQueryParam } from '@/utils/url.utils';
+import { useDebouncedValue } from '@/utils/debounce';
+import { Product } from '@/types/product';
 import ProductsView from './ProductsView';
 
 interface ProductsContainerProps {
@@ -18,7 +21,7 @@ interface ProductsContainerProps {
 
 const ProductsContainer: React.FC<ProductsContainerProps> = () => {
   const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
+  const { toast } = useToast();
   
   // Products state
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -26,14 +29,21 @@ const ProductsContainer: React.FC<ProductsContainerProps> = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [sortBy, setSortBy] = useState('recommended');
   const [viewMode, setViewMode] = useState('grid');
-  const [selectedCategory, setSelectedCategory] = useState<string>(queryParams.get('category') || 'all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    getQueryParam(location.search, 'category', 'all')
+  );
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedFabrics, setSelectedFabrics] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState([0, 10000]);
-  const [searchQuery, setSearchQuery] = useState(queryParams.get('query') || queryParams.get('search') || '');
+  const [searchQuery, setSearchQuery] = useState(
+    getQueryParam(location.search, 'query') || getQueryParam(location.search, 'search')
+  );
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Debounced search query for URL updates
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   
   // API pagination state
   const [isLoading, setIsLoading] = useState(false);
@@ -46,15 +56,12 @@ const ProductsContainer: React.FC<ProductsContainerProps> = () => {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const response = await categoriesAPI.getAll();
-        const cats = Array.isArray(response) ? response : [];
+        const cats = await productService.getCategories();
         setCategories(cats);
         
         // Find category ID if category name is selected
         if (selectedCategory !== 'all') {
-          const foundCategory = cats.find((c: any) => 
-            c.name?.toLowerCase() === selectedCategory.toLowerCase()
-          );
+          const foundCategory = productService.findCategoryByName(cats, selectedCategory);
           if (foundCategory) {
             setSelectedCategoryId(foundCategory.id);
           }
@@ -68,128 +75,94 @@ const ProductsContainer: React.FC<ProductsContainerProps> = () => {
   }, [selectedCategory]);
 
   // Load products from API
-  const loadProducts = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const loadProducts = async (page: number = 1, reset: boolean = false) => {
     if (isLoading && !reset) return;
     
     setIsLoading(true);
     
     try {
-      let response;
+      // Use ProductService for all product fetching
+      const result = await productService.getPublicProducts({
+        query: searchQuery || undefined,
+        category_id: selectedCategoryId || undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
+        max_price: priceRange[1] < 10000 ? priceRange[1] : undefined,
+        page,
+        per_page: 20,
+      });
       
-      // Use search API if there's a query, category, or price filter
-      if (searchQuery || selectedCategoryId || priceRange[0] > 0 || priceRange[1] < 10000) {
-        response = await productsAPI.searchProducts({
-          query: searchQuery || undefined,
-          category_id: selectedCategoryId || undefined,
-          min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-          max_price: priceRange[1] < 10000 ? priceRange[1] : undefined,
-          page,
-          per_page: 20,
-        });
-        
-        // Search API returns { products, facets, pagination }
-        const productsData = response.products || [];
-        const pagination = response.pagination || {};
-        
-        if (reset) {
-          setAllProducts(productsData.map(mapBackendProductToList));
-        } else {
-          setAllProducts(prev => [...prev, ...productsData.map(mapBackendProductToList)]);
-        }
-        
-        setHasMore(page < (pagination.total_pages || 1));
-        setTotalCount(pagination.total_count || 0);
+      if (reset) {
+        setAllProducts(result.products);
       } else {
-        // Use regular products API
-        response = await productsAPI.getPublicProducts({
-          page,
-          per_page: 20
-        });
-        
-        // Handle response structure
-        let productsData: any[] = [];
-        let pagination: any = null;
-        
-        if (Array.isArray(response)) {
-          productsData = response;
-          pagination = {
-            total_count: response.length,
-            total_pages: 1,
-            current_page: page,
-            per_page: 20,
-          };
-        } else if (response && typeof response === 'object') {
-          productsData = response.products || [];
-          pagination = response.pagination || null;
-        }
-        
-        if (reset) {
-          setAllProducts(productsData.map(mapBackendProductToList));
-        } else {
-          setAllProducts(prev => [...prev, ...productsData.map(mapBackendProductToList)]);
-        }
-        
-        if (pagination) {
-          setHasMore(page < pagination.total_pages);
-          setTotalCount(pagination.total_count || 0);
-        } else {
-          setHasMore(productsData.length === 20);
-        }
+        setAllProducts(prev => [...prev, ...result.products]);
       }
       
+      setHasMore(page < result.total_pages);
+      setTotalCount(result.total);
+      
       setCurrentPage(page);
-    } catch (error) {
-      console.error('Error loading products:', error);
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Failed to load products. Please try again.';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
       setIsInitialLoading(false);
     }
-  }, [isLoading, searchQuery, selectedCategoryId, priceRange]);
+  };
 
-  // Initial load
+  // Sync URL params with state on mount and when URL changes
+  useEffect(() => {
+    const queryFromUrl = getQueryParam(location.search, 'query') || getQueryParam(location.search, 'search');
+    const categoryFromUrl = getQueryParam(location.search, 'category');
+    
+    // Update search query if URL has different value
+    if (queryFromUrl !== searchQuery) {
+      setSearchQuery(queryFromUrl);
+    }
+    
+    // Update category if URL has different value
+    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+      const foundCategory = productService.findCategoryByIdOrName(categories, categoryFromUrl);
+      if (foundCategory) {
+        setSelectedCategoryId(foundCategory.id);
+      }
+    }
+  }, [location.search, categories, searchQuery, selectedCategory]);
+
+  // Load products when search params change
   useEffect(() => {
     loadProducts(1, true);
-  }, [loadProducts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedCategoryId, priceRange[0], priceRange[1]]);
 
-  // Filter products
+  // Filter and sort products using centralized utility
   useEffect(() => {
-    let filtered = [...allProducts];
-    
-    // Apply filters
-    if (selectedFabrics.length > 0) {
-      filtered = filtered.filter(p => selectedFabrics.includes(p.fabric));
-    }
-    if (selectedColors.length > 0) {
-      filtered = filtered.filter(p => selectedColors.some(color => p.colors.includes(color)));
-    }
-    if (selectedSizes.length > 0) {
-      filtered = filtered.filter(p => selectedSizes.some(size => p.sizes.includes(size)));
-    }
-    
-    // Apply sorting
-    switch (sortBy) {
-      case 'price_low_high':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price_high_low':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'newest':
-        filtered.sort((a, b) => (b as any).createdAt - (a as any).createdAt);
-        break;
-      case 'oldest':
-        filtered.sort((a, b) => (a as any).createdAt - (b as any).createdAt);
-        break;
-      default:
-        // recommended - keep original order
-        break;
-    }
+    const filtered = productFilterUtils.filterAndSort(
+      allProducts,
+      {
+        fabrics: selectedFabrics.length > 0 ? selectedFabrics : undefined,
+        colors: selectedColors.length > 0 ? selectedColors : undefined,
+        sizes: selectedSizes.length > 0 ? selectedSizes : undefined,
+        priceRange: priceRange[0] > 0 || priceRange[1] < 10000 
+          ? [priceRange[0], priceRange[1]] as [number, number]
+          : undefined,
+      },
+      sortBy as any
+    );
     
     setFilteredProducts(filtered);
-  }, [allProducts, selectedFabrics, selectedColors, selectedSizes, sortBy]);
+  }, [allProducts, selectedFabrics, selectedColors, selectedSizes, sortBy, priceRange]);
 
+  // Infinite scroll ref (for compatibility with ProductsView)
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  
   // Infinite scroll
-  const { loadMoreRef } = useInfiniteScroll({
+  useInfiniteScroll({
     hasMore,
     isLoading,
     onLoadMore: () => {
@@ -200,29 +173,26 @@ const ProductsContainer: React.FC<ProductsContainerProps> = () => {
   });
 
   // Handlers
-  const handleSortChange = useCallback((newSortBy: string) => {
+  const handleSortChange = (newSortBy: string) => {
     setSortBy(newSortBy);
-  }, []);
+  };
 
-  const handleViewModeChange = useCallback((mode: 'grid' | 'list') => {
+  const handleViewModeChange = (mode: 'grid' | 'list') => {
     setViewMode(mode);
-  }, []);
+  };
 
-  const handleCategoryChange = useCallback((category: string) => {
+  const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
     if (category === 'all') {
       setSelectedCategoryId(null);
     } else {
-      const foundCategory = categories.find((c: any) => 
-        c.name?.toLowerCase() === category.toLowerCase()
-      );
+      const foundCategory = productService.findCategoryByName(categories, category);
       setSelectedCategoryId(foundCategory?.id || null);
     }
     setCurrentPage(1);
-    loadProducts(1, true);
-  }, [categories, loadProducts]);
+  };
 
-  const handleFilterChange = useCallback((filters: {
+  const handleFilterChange = (filters: {
     fabrics?: string[];
     colors?: string[];
     sizes?: string[];
@@ -232,17 +202,22 @@ const ProductsContainer: React.FC<ProductsContainerProps> = () => {
     if (filters.colors !== undefined) setSelectedColors(filters.colors);
     if (filters.sizes !== undefined) setSelectedSizes(filters.sizes);
     if (filters.priceRange !== undefined) setPriceRange(filters.priceRange);
-  }, []);
+  };
 
-  const handleSearch = useCallback((query: string) => {
+  // Update URL when debounced search query changes
+  useEffect(() => {
+    updateQueryParam(location.pathname, location.search, 'query', debouncedSearchQuery || null);
+  }, [debouncedSearchQuery, location.pathname, location.search]);
+
+  const handleSearch = (query: string) => {
+    // Update search query immediately for UI responsiveness
     setSearchQuery(query);
     setCurrentPage(1);
-    loadProducts(1, true);
-  }, [loadProducts]);
+  };
 
-  const handleToggleFilters = useCallback(() => {
+  const handleToggleFilters = () => {
     setShowFilters(prev => !prev);
-  }, []);
+  };
 
   // Pass all data and handlers to presentational component
   return (
@@ -254,12 +229,12 @@ const ProductsContainer: React.FC<ProductsContainerProps> = () => {
       hasMore={hasMore}
       totalCount={totalCount}
       sortBy={sortBy}
-      viewMode={viewMode}
+      viewMode={viewMode as 'grid' | 'list'}
       selectedCategory={selectedCategory}
       selectedFabrics={selectedFabrics}
       selectedColors={selectedColors}
       selectedSizes={selectedSizes}
-      priceRange={priceRange}
+      priceRange={priceRange as [number, number]}
       searchQuery={searchQuery}
       showFilters={showFilters}
       loadMoreRef={loadMoreRef}

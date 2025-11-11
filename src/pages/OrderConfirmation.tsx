@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from 'react';
+/**
+ * OrderConfirmation Page - Clean Architecture Implementation
+ * Uses OrderService for business logic
+ * Follows: UI → Logic (OrderService) → Data (API Services)
+ */
+
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle, Package, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
-import { ordersAPI } from '@/services/api';
+import { orderService } from '@/services/order.service';
 import { useToast } from '@/hooks/use-toast';
 
 const OrderConfirmation = () => {
@@ -32,15 +38,16 @@ const OrderConfirmation = () => {
 
   const loadOrderDetails = async () => {
     if (!orderId) return;
-    
+
     setIsLoading(true);
     try {
-      const response = await ordersAPI.getOrderDetails(orderId);
-      setOrder(response as any);
+      const orderData = await orderService.getOrderDetails(orderId);
+      setOrder(orderData as any);
     } catch (error: any) {
+      const errorMessage = orderService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to load order details',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

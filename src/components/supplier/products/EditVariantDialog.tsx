@@ -1,3 +1,9 @@
+/**
+ * EditVariantDialog Component - Clean Architecture Implementation
+ * Uses AttributeService for attribute operations
+ * Follows: UI → Logic (AttributeService) → Data (API Services)
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -13,14 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ProductVariant } from '../types';
-import { attributeTypesAPI } from '@/services/api';
-
-interface AttributeType {
-  id: number;
-  name: string;
-  level?: 'product' | 'variant';
-  values: Array<{ id: number; value: string; hex_code?: string }>;
-}
+import { attributeService } from '@/services/attribute.service';
+import type { AttributeType } from '@/services/attribute.mapper';
 
 interface SelectedAttribute {
   attributeTypeId: number;
@@ -89,18 +89,10 @@ const EditVariantDialog: React.FC<EditVariantDialogProps> = ({
       setIsLoadingAttributes(true);
       // Load only variant-level attributes (Color, Size)
       // Pass categoryId to filter Size values by category
-      const response = await attributeTypesAPI.getAll('variant', categoryId);
-      console.log('Loaded variant-level attribute types response:', response);
-      
-      let data: any[] = [];
-      if (Array.isArray(response)) {
-        data = response;
-      } else if (typeof response === 'object' && response !== null) {
-        // API interceptor already extracts data, so response is the data directly
-        data = [];
-      }
-      
-      const attributeTypesArray: AttributeType[] = Array.isArray(data) ? data : [];
+      const attributeTypesArray = await attributeService.getAllAttributeTypes({
+        level: 'variant',
+        category_id: categoryId,
+      });
       console.log('Parsed variant-level attribute types:', attributeTypesArray);
       
       setAttributeTypes(attributeTypesArray);
@@ -117,8 +109,7 @@ const EditVariantDialog: React.FC<EditVariantDialogProps> = ({
     
     try {
       // Load all attribute types to map attribute names to IDs
-      const response = await attributeTypesAPI.getAll();
-      const allAttributeTypes: AttributeType[] = Array.isArray(response) ? response : [];
+      const allAttributeTypes = await attributeService.getAllAttributeTypes();
       
       const selected: SelectedAttribute[] = [];
       

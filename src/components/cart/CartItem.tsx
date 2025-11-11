@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Product } from '@/contexts/CartContext';
+// Product type not needed here - component uses props only
 
 interface CartItemProps {
   item: {
@@ -90,5 +90,6 @@ const CartItem = memo<CartItemProps>(({ item, updatingItem, onQuantityChange, on
 CartItem.displayName = 'CartItem';
 
 export default CartItem;
+
 
 

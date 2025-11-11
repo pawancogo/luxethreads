@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, Menu, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useCart } from '@/contexts/CartContext';
+import { useCartItemCount } from '@/stores/cartStore';
 
 interface MobileMenuButtonProps {
   isMenuOpen: boolean;
@@ -10,15 +10,15 @@ interface MobileMenuButtonProps {
 }
 
 const MobileMenuButton: React.FC<MobileMenuButtonProps> = ({ isMenuOpen, setIsMenuOpen }) => {
-  const { state } = useCart();
+  const itemCount = useCartItemCount();
 
   return (
     <div className="md:hidden flex items-center space-x-4">
       <Link to="/cart" className="relative p-2 text-gray-700">
         <ShoppingCart className="h-6 w-6" />
-        {state.itemCount > 0 && (
+        {itemCount > 0 && (
           <Badge className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
-            {state.itemCount}
+            {itemCount}
           </Badge>
         )}
       </Link>

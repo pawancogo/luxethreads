@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * AnalyticsTab Component - Clean Architecture Implementation
+ * Uses SupplierAnalyticsService for business logic
+ * Follows: UI → Logic (SupplierAnalyticsService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Calendar, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supplierAnalyticsAPI } from '@/services/api';
-import { SupplierAnalytics } from './types';
+import { supplierAnalyticsService } from '@/services/supplier-analytics.service';
+import { SupplierAnalytics } from '@/services/supplier-analytics.mapper';
 import AnalyticsCards from './analytics/AnalyticsCards';
 import SimpleLineChart from './analytics/SimpleLineChart';
 import TopProductsTable from './analytics/TopProductsTable';
@@ -28,13 +34,13 @@ const AnalyticsTab: React.FC = () => {
   const loadAnalytics = async () => {
     setIsLoading(true);
     try {
-      const data = await supplierAnalyticsAPI.getAnalytics({
+      const data = await supplierAnalyticsService.getAnalytics({
         start_date: startDate,
         end_date: endDate,
       });
       setAnalytics(data);
     } catch (error: any) {
-      const errorMessage = error?.errors?.[0] || error?.message || 'Failed to load analytics';
+      const errorMessage = supplierAnalyticsService.extractErrorMessage(error);
       toast({
         title: 'Error',
         description: errorMessage,

@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * SupportTickets Page - Clean Architecture Implementation
+ * Uses SupportTicketService for business logic
+ * Follows: UI → Logic (SupportTicketService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,32 +27,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Plus, MessageSquare, Loader2, AlertCircle, CheckCircle, Clock, XCircle } from 'lucide-react';
-import { supportTicketsAPI } from '@/services/api';
+import { supportTicketService } from '@/services/support-ticket.service';
+import type { SupportTicket, TicketDetail } from '@/services/support-ticket.mapper';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-
-interface SupportTicket {
-  id: number;
-  ticket_id: string;
-  subject: string;
-  category: string;
-  status: string;
-  priority: string;
-  created_at: string;
-  message_count: number;
-}
-
-interface TicketDetail extends SupportTicket {
-  description: string;
-  resolution?: string;
-  messages: Array<{
-    id: number;
-    message: string;
-    sender_type: string;
-    sender_name: string;
-    created_at: string;
-  }>;
-}
 
 const statusColors: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -93,14 +77,13 @@ const SupportTickets: React.FC = () => {
   const fetchTickets = async () => {
     setIsLoading(true);
     try {
-      const response = await supportTicketsAPI.getTickets();
-      if (response.data?.success && response.data?.data) {
-        setTickets(response.data.data);
-      }
+      const ticketsList = await supportTicketService.getTickets();
+      setTickets(ticketsList);
     } catch (error: any) {
+      const errorMessage = supportTicketService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch support tickets',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -110,15 +93,14 @@ const SupportTickets: React.FC = () => {
 
   const fetchTicketDetail = async (ticketId: number) => {
     try {
-      const response = await supportTicketsAPI.getTicket(ticketId);
-      if (response.data?.success && response.data?.data) {
-        setSelectedTicket(response.data.data);
-        setIsDialogOpen(true);
-      }
+      const ticketDetail = await supportTicketService.getTicketDetails(ticketId);
+      setSelectedTicket(ticketDetail);
+      setIsDialogOpen(true);
     } catch (error: any) {
+      const errorMessage = supportTicketService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch ticket details',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -136,24 +118,19 @@ const SupportTickets: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const response = await supportTicketsAPI.createTicket({
-        ...newTicket,
-        initial_message: newTicket.description,
+      await supportTicketService.createTicket(newTicket);
+      toast({
+        title: 'Success',
+        description: 'Support ticket created successfully',
       });
-      
-      if (response.data?.success) {
-        toast({
-          title: 'Success',
-          description: 'Support ticket created successfully',
-        });
-        setIsCreateDialogOpen(false);
-        setNewTicket({ subject: '', description: '', category: 'other', priority: 'medium' });
-        fetchTickets();
-      }
+      setIsCreateDialogOpen(false);
+      setNewTicket({ subject: '', description: '', category: 'other', priority: 'medium' });
+      fetchTickets();
     } catch (error: any) {
+      const errorMessage = supportTicketService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.response?.data?.message || 'Failed to create support ticket',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -166,22 +143,18 @@ const SupportTickets: React.FC = () => {
 
     setIsSendingMessage(true);
     try {
-      const response = await supportTicketsAPI.sendMessage(selectedTicket.id, {
-        message: newMessage,
+      await supportTicketService.sendMessage(selectedTicket.id, { message: newMessage });
+      toast({
+        title: 'Success',
+        description: 'Message sent successfully',
       });
-      
-      if (response.data?.success) {
-        toast({
-          title: 'Success',
-          description: 'Message sent successfully',
-        });
-        setNewMessage('');
-        fetchTicketDetail(selectedTicket.id);
-      }
+      setNewMessage('');
+      fetchTicketDetail(selectedTicket.id);
     } catch (error: any) {
+      const errorMessage = supportTicketService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to send message',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

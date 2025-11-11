@@ -1,9 +1,11 @@
 /**
  * Authentication API Service
- * Handles user and admin authentication
+ * Handles user authentication (cookies-based, no localStorage)
+ * Note: Admin login is not handled in frontend
  */
 
 import { api } from './base';
+import { getDeviceInfo } from '@/utils/deviceInfo';
 
 export interface SignupData {
   first_name: string;
@@ -15,40 +17,54 @@ export interface SignupData {
 }
 
 export interface LoginResponse {
-  token?: string;
   user?: any;
-  admin?: any;
 }
 
 export const authService = {
   /**
    * User signup
+   * Token is stored in httpOnly cookie automatically
    */
   signup: async (userData: SignupData): Promise<LoginResponse> => {
-    const response = await api.post('/signup', { user: userData });
-    if (response?.token) {
-      localStorage.setItem('auth_token', response.token);
+    try {
+      const response = await api.post('/signup', { user: userData });
+      // Token is in httpOnly cookie, not in response
+      return response as LoginResponse;
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.error('[authService] Signup error:', {
+          message: error?.message,
+          responseData: error?.response?.data,
+          status: error?.response?.status
+        });
+      }
+      throw error;
     }
-    return response;
   },
 
   /**
    * User login
+   * Token is stored in httpOnly cookie automatically
    */
   login: async (email: string, password: string): Promise<LoginResponse> => {
-    const response = await api.post('/login', { email, password });
-    if (response?.token) {
-      localStorage.setItem('auth_token', response.token);
-    }
-    return response;
+    const deviceInfo = getDeviceInfo();
+    const response = await api.post('/login', { 
+      email, 
+      password,
+      ...deviceInfo
+    });
+    // Token is in httpOnly cookie, not in response
+    return response as LoginResponse;
   },
 
   /**
    * User logout
+   * Clears httpOnly cookie on server
    */
-  logout: (): void => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
+  logout: async (): Promise<void> => {
+    await api.delete('/logout');
+    // Cookie is cleared by server
   },
 
   /**
@@ -59,44 +75,21 @@ export const authService = {
   },
 
   /**
-   * Reset password
+   * Reset password (token-based)
    */
   resetPassword: async (
-    email: string,
-    tempPassword: string,
-    newPassword: string,
+    token: string,
+    password: string,
     passwordConfirmation?: string
   ): Promise<any> => {
     return api.post('/password/reset', {
-      email,
-      temp_password: tempPassword,
-      new_password: newPassword,
-      password_confirmation: passwordConfirmation || newPassword,
+      token,
+      password,
+      password_confirmation: passwordConfirmation || password,
     });
   },
 };
 
-export const adminAuthService = {
-  /**
-   * Admin login
-   */
-  login: async (email: string, password: string): Promise<LoginResponse> => {
-    const response = await api.post('/admin/login', { email, password });
-    if (response?.token) {
-      localStorage.setItem('admin_token', response.token);
-      if (response?.admin) {
-        localStorage.setItem('admin', JSON.stringify(response.admin));
-      }
-    }
-    return response;
-  },
-
-  /**
-   * Admin logout
-   */
-  logout: (): void => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin');
-  },
-};
+// Admin authentication is handled by backend HTML interface only
+// No admin services needed in frontend
 

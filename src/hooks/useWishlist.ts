@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { wishlistAPI } from '@/services/api';
+/**
+ * useWishlist Hook - Simplified
+ * Uses WishlistService for business logic
+ * Removed unnecessary hooks (useCallback, useMemo) per YAGNI principle
+ */
+
+import { useState, useEffect } from 'react';
+import { wishlistService } from '@/services/wishlist.service';
 
 interface UseWishlistState {
   items: any[];
@@ -8,38 +14,43 @@ interface UseWishlistState {
 }
 
 export function useWishlist() {
-  const [state, setState] = useState<UseWishlistState>({ items: [], loading: false, error: null });
+  const [state, setState] = useState<UseWishlistState>({
+    items: [],
+    loading: false,
+    error: null,
+  });
 
-  const load = useCallback(async () => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+  const load = async () => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const res = await wishlistAPI.getWishlist();
-      setState({ items: res?.items || res || [], loading: false, error: null });
-      return res;
+      const items = await wishlistService.getWishlist();
+      setState({ items, loading: false, error: null });
+      return items;
     } catch (e: any) {
-      setState({ items: [], loading: false, error: e?.message || 'Failed to load wishlist' });
+      const errorMessage = wishlistService.extractErrorMessage(e);
+      setState({ items: [], loading: false, error: errorMessage });
       throw e;
     }
-  }, []);
+  };
 
-  const add = useCallback(async (productVariantId: number) => {
-    await wishlistAPI.addToWishlist(productVariantId);
+  const add = async (productVariantId: number) => {
+    await wishlistService.addToWishlist(productVariantId);
     await load();
-  }, [load]);
+  };
 
-  const remove = useCallback(async (wishlistItemId: number) => {
-    await wishlistAPI.removeFromWishlist(wishlistItemId);
+  const remove = async (wishlistItemId: number) => {
+    await wishlistService.removeFromWishlist(wishlistItemId);
     await load();
-  }, [load]);
+  };
 
   useEffect(() => {
     load().catch(() => {});
-  }, [load]);
+  }, []);
 
-  return useMemo(() => ({
+  return {
     ...state,
     reload: load,
     add,
     remove,
-  }), [state, load, add, remove]);
+  };
 }

@@ -1,3 +1,9 @@
+/**
+ * AddVariantDialog Component - Clean Architecture Implementation
+ * Uses AttributeService for attribute operations
+ * Follows: UI → Logic (AttributeService) → Data (API Services)
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -13,14 +19,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, ChevronUp, ChevronDown, Image as ImageIcon, X } from 'lucide-react';
-import { attributeTypesAPI } from '@/services/api';
+import { attributeService } from '@/services/attribute.service';
+import type { AttributeType } from '@/services/attribute.mapper';
 
-interface AttributeType {
-  id: number;
-  name: string;
-  level?: 'product' | 'variant';
-  values: Array<{ id: number; value: string; hex_code?: string }>;
-}
+// AttributeType is imported from attribute.mapper
 
 interface SelectedAttribute {
   attributeTypeId: number;
@@ -89,20 +91,10 @@ const AddVariantDialog: React.FC<AddVariantDialogProps> = ({
       setIsLoadingAttributes(true);
       // Load only variant-level attributes (Color, Size)
       // Pass categoryId to filter Size values by category
-      const response = await attributeTypesAPI.getAll('variant', categoryId);
-      console.log('Loaded variant-level attribute types response:', response);
-      
-      // Handle different response formats
-      let data: any[] = [];
-      if (Array.isArray(response)) {
-        data = response;
-      } else if (typeof response === 'object' && response !== null) {
-        // API interceptor already extracts data, so response is the data directly
-        data = [];
-      }
-      
-      const attributeTypesArray: AttributeType[] = Array.isArray(data) ? data : [];
-      console.log('Parsed variant-level attribute types:', attributeTypesArray);
+      const attributeTypesArray = await attributeService.getAllAttributeTypes({
+        level: 'variant',
+        category_id: categoryId,
+      });
       
       if (attributeTypesArray.length === 0) {
         console.warn('No variant-level attribute types returned from API. Check if migration ran: rails db:migrate');
@@ -111,11 +103,6 @@ const AddVariantDialog: React.FC<AddVariantDialogProps> = ({
       setAttributeTypes(attributeTypesArray);
     } catch (error: any) {
       console.error('Failed to load attribute types:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status
-      });
       setAttributeTypes([]);
     } finally {
       setIsLoadingAttributes(false);
@@ -125,8 +112,7 @@ const AddVariantDialog: React.FC<AddVariantDialogProps> = ({
   const loadSelectedAttributes = async () => {
     // Load all attribute types to map IDs to names
     try {
-      const response = await attributeTypesAPI.getAll();
-      const allAttributeTypes: AttributeType[] = Array.isArray(response) ? response : [];
+      const allAttributeTypes = await attributeService.getAllAttributeTypes();
       
       const selected: SelectedAttribute[] = [];
       (newVariant.attribute_value_ids || []).forEach((valueId: number) => {

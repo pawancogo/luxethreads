@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { useFilter } from '@/contexts/FilterContext';
+import { useFilter, useFilters, useAvailableFilters } from '@/stores/filterStore';
 import { ProductFilters } from '@/types/filters';
 
 interface AdvancedProductFiltersProps {
@@ -21,14 +21,14 @@ const AdvancedProductFilters: React.FC<AdvancedProductFiltersProps> = ({
   onToggle,
   className = '',
 }) => {
+  const filters = useFilters();
+  const availableFilters = useAvailableFilters();
   const {
-    filters,
     setFilter,
     clearFilter,
     clearAllFilters,
     getActiveFilters,
     isFilterActive,
-    availableFilters,
   } = useFilter();
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -456,5 +456,6 @@ const AdvancedProductFilters: React.FC<AdvancedProductFiltersProps> = ({
 };
 
 export default AdvancedProductFilters;
+
 
 

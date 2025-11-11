@@ -1,10 +1,16 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Wishlist Page - Clean Architecture Implementation
+ * Uses WishlistService for business logic
+ * Follows: UI → Logic (WishlistService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Heart, ShoppingCart } from 'lucide-react';
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/stores/userStore';
 import { useToast } from '@/hooks/use-toast';
-import { wishlistAPI } from '@/services/api';
+import { wishlistService } from '@/services/wishlist.service';
 import { Link, Navigate } from 'react-router-dom';
 
 interface WishlistItem {
@@ -40,13 +46,13 @@ const Wishlist = () => {
   const loadWishlist = async () => {
     setIsLoading(true);
     try {
-      const response = await wishlistAPI.getWishlist();
-      // API interceptor already extracts data, so response is the data directly
-      setItems(Array.isArray(response) ? response : []);
+      const itemsList = await wishlistService.getWishlist();
+      setItems(itemsList as any);
     } catch (error: any) {
+      const errorMessage = wishlistService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to load wishlist',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -56,16 +62,17 @@ const Wishlist = () => {
 
   const handleRemove = async (itemId: number) => {
     try {
-      await wishlistAPI.removeFromWishlist(itemId);
+      await wishlistService.removeFromWishlist(itemId);
       toast({
         title: 'Success',
         description: 'Item removed from wishlist',
       });
       loadWishlist();
     } catch (error: any) {
+      const errorMessage = wishlistService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to remove item',
+        description: errorMessage,
         variant: 'destructive',
       });
     }

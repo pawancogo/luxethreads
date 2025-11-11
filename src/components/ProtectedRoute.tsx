@@ -1,6 +1,10 @@
-import React from 'react';
+/**
+ * ProtectedRoute - Simplified
+ * Removed unnecessary useRef per YAGNI principle
+ */
+
 import { Navigate } from 'react-router-dom';
-import { useUser, UserRole } from '@/contexts/UserContext';
+import { useUser, useUserLoading, useHasRole, UserRole } from '@/stores/userStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldX } from 'lucide-react';
 
@@ -15,9 +19,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   allowedRoles, 
   redirectTo = '/auth' 
 }) => {
-  const { user, isLoading, hasRole } = useUser();
+  const user = useUser();
+  const isLoading = useUserLoading();
+  const hasRole = useHasRole();
+  
+  // Check if user is being set (session exists but user state not ready)
+  const hasLoggedIn = sessionStorage.getItem('user_logged_in') === 'true';
+  const isUserBeingSet = hasLoggedIn && !user && !isLoading;
 
-  if (isLoading) {
+  // Show loading while checking authentication
+  if (isLoading || isUserBeingSet) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-amber-600"></div>
@@ -26,14 +37,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
-    // Clear all authentication data when user is not available
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth_token');
-    
-    // Clear specific auth cookies
+    // Clear cookies
     document.cookie = 'authtoken=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+    document.cookie = 'auth_token=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
     
-    // Clear all other cookies
     document.cookie.split(";").forEach((c) => {
       document.cookie = c
         .replace(/^ +/, "")

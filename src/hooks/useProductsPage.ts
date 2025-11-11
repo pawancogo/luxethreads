@@ -1,12 +1,19 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+/**
+ * useProductsPage Hook - Clean Architecture Implementation
+ * Removed unnecessary useCallback and useMemo hooks
+ * Uses services instead of direct API calls
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { productsAPI, categoriesAPI } from '@/services/api';
-import { mapBackendProductToList } from '@/lib/productMapper';
-import { Product } from '@/contexts/CartContext';
+import { productService } from '@/services/product.service';
+import { productFilterUtils } from '@/services/product-filter.utils';
+import { Product } from '@/types/product';
 
 export const useProductsPage = () => {
   const location = useLocation();
-  const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const queryParams = new URLSearchParams(location.search);
   
   // Products state
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -34,14 +41,11 @@ export const useProductsPage = () => {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const response = await categoriesAPI.getAll();
-        const cats = Array.isArray(response) ? response : [];
+        const cats = await productService.getCategories();
         setCategories(cats);
         
         if (selectedCategory !== 'all') {
-          const foundCategory = cats.find((c: any) => 
-            c.name?.toLowerCase() === selectedCategory.toLowerCase()
-          );
+          const foundCategory = productService.findCategoryByName(cats, selectedCategory);
           if (foundCategory) {
             setSelectedCategoryId(foundCategory.id);
           }
@@ -50,126 +54,76 @@ export const useProductsPage = () => {
         // Error handled silently - categories will be empty
       }
     };
-    
+
     loadCategories();
   }, [selectedCategory]);
 
   // Load products from API
-  const loadProducts = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const loadProducts = async (page: number = 1, reset: boolean = false) => {
     if (isLoading && !reset) return;
     
     setIsLoading(true);
     
     try {
-      let response;
-      
-      if (searchQuery || selectedCategoryId || priceRange[0] > 0 || priceRange[1] < 10000) {
-        response = await productsAPI.searchProducts({
-          query: searchQuery || undefined,
-          category_id: selectedCategoryId || undefined,
-          min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-          max_price: priceRange[1] < 10000 ? priceRange[1] : undefined,
-          page,
-          per_page: 20,
-        });
-      } else {
-        response = await productsAPI.getPublicProducts({
-          page,
-          per_page: 20,
-        });
-      }
-      
-      const productsData = Array.isArray(response) 
-        ? response 
-        : ((response as any)?.products || []);
-      
-      const mappedProducts = productsData.map(mapBackendProductToList);
+      const result = await productService.getPublicProducts({
+        query: searchQuery || undefined,
+        category_id: selectedCategoryId || undefined,
+        min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
+        max_price: priceRange[1] < 10000 ? priceRange[1] : undefined,
+        page,
+        per_page: 20,
+      });
       
       if (reset) {
-        setAllProducts(mappedProducts);
-        setFilteredProducts(mappedProducts);
+        setAllProducts(result.products);
+        setFilteredProducts(result.products);
       } else {
-        setAllProducts(prev => [...prev, ...mappedProducts]);
-        setFilteredProducts(prev => [...prev, ...mappedProducts]);
+        setAllProducts(prev => [...prev, ...result.products]);
+        setFilteredProducts(prev => [...prev, ...result.products]);
       }
       
       setCurrentPage(page);
-      setHasMore(productsData.length === 20);
-      setTotalCount((response as any)?.total_count || mappedProducts.length);
+      setHasMore(page < result.total_pages);
+      setTotalCount(result.total);
     } catch (error) {
       // Error handling
     } finally {
       setIsLoading(false);
       setIsInitialLoading(false);
     }
-  }, [searchQuery, selectedCategoryId, priceRange, isLoading]);
+  };
 
   // Initial load
   useEffect(() => {
     loadProducts(1, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedCategoryId, priceRange[0], priceRange[1]]);
 
-  // Filter products
-  const applyFilters = useCallback(() => {
-    let filtered = [...allProducts];
-
-    if (selectedFabrics.length > 0) {
-      filtered = filtered.filter(p => 
-        selectedFabrics.some(fabric => 
-          p.attributes?.some(attr => 
-            attr.attribute_type === 'Fabric' && attr.attribute_value === fabric
-          )
-        )
-      );
-    }
-
-    if (selectedColors.length > 0) {
-      filtered = filtered.filter(p => 
-        selectedColors.some(color => 
-          p.attributes?.some(attr => 
-            attr.attribute_type === 'Color' && attr.attribute_value === color
-          )
-        )
-      );
-    }
-
-    if (selectedSizes.length > 0) {
-      filtered = filtered.filter(p => 
-        selectedSizes.some(size => 
-          p.attributes?.some(attr => 
-            attr.attribute_type === 'Size' && attr.attribute_value === size
-          )
-        )
-      );
-    }
-
-    // Sort
-    switch (sortBy) {
-      case 'price-low':
-        filtered.sort((a, b) => (a.discountedPrice || a.price) - (b.discountedPrice || b.price));
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => (b.discountedPrice || b.price) - (a.discountedPrice || a.price));
-        break;
-      case 'newest':
-        filtered.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        break;
-      default:
-        break;
-    }
+  // Filter products using centralized utility
+  const applyFilters = () => {
+    const filtered = productFilterUtils.filterAndSort(
+      allProducts,
+      {
+        fabrics: selectedFabrics.length > 0 ? selectedFabrics : undefined,
+        colors: selectedColors.length > 0 ? selectedColors : undefined,
+        sizes: selectedSizes.length > 0 ? selectedSizes : undefined,
+      },
+      sortBy as any
+    );
 
     setFilteredProducts(filtered);
-  }, [allProducts, selectedFabrics, selectedColors, selectedSizes, sortBy]);
+  };
 
   useEffect(() => {
     applyFilters();
-  }, [applyFilters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProducts, selectedFabrics, selectedColors, selectedSizes, sortBy]);
 
-  const loadMore = useCallback(() => {
+  const loadMore = () => {
     if (!isLoading && hasMore) {
       loadProducts(currentPage + 1, false);
     }
-  }, [isLoading, hasMore, currentPage, loadProducts]);
+  };
 
   return {
     filteredProducts,
@@ -199,5 +153,6 @@ export const useProductsPage = () => {
     totalCount,
   };
 };
+
 
 

@@ -1,14 +1,20 @@
-import React, { useState, useCallback } from 'react';
+/**
+ * Cart Page - Clean Architecture Implementation
+ * Uses CouponService for business logic
+ * Follows: UI → Logic (CouponService) → Data (API Services)
+ */
+
+import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { ShoppingBag, X, CheckCircle } from 'lucide-react';
-import { useCart } from '@/contexts/CartContext';
-import { useUser } from '@/contexts/UserContext';
+import { useCart } from '@/stores/cartStore';
+import { useUser } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import CartItem from '@/components/cart/CartItem';
-import { couponsAPI } from '@/services/api';
+import { couponService } from '@/services/coupon.service';
 import { useToast } from '@/hooks/use-toast';
 
 const Cart = () => {
@@ -26,23 +32,23 @@ const Cart = () => {
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
 
-  const handleQuantityChange = useCallback(async (cartItemId: number, newQuantity: number) => {
+  const handleQuantityChange = async (cartItemId: number, newQuantity: number) => {
     setUpdatingItem(cartItemId);
     try {
       await updateQuantity(cartItemId, newQuantity);
     } finally {
       setUpdatingItem(null);
     }
-  }, [updateQuantity]);
+  };
 
-  const handleRemoveItem = useCallback(async (cartItemId: number) => {
+  const handleRemoveItem = async (cartItemId: number) => {
     setUpdatingItem(cartItemId);
     try {
       await removeFromCart(cartItemId);
     } finally {
       setUpdatingItem(null);
     }
-  }, [removeFromCart]);
+  };
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -56,12 +62,10 @@ const Cart = () => {
 
     setIsApplyingCoupon(true);
     try {
-      // Validate coupon first
-      const validation = await couponsAPI.validateCoupon(couponCode.trim());
-      
-      if (validation && validation.is_valid) {
-        // Apply coupon
-        const result = await couponsAPI.applyCoupon(couponCode.trim(), state.total);
+      const validation = await couponService.validateCoupon(couponCode.trim());
+
+      if (validation.is_valid) {
+        const result = await couponService.applyCoupon(couponCode.trim(), state.total);
         setAppliedCoupon(result);
         setDiscountAmount(result.discount_amount || 0);
         toast({
@@ -71,14 +75,15 @@ const Cart = () => {
       } else {
         toast({
           title: 'Invalid Coupon',
-          description: validation?.message || 'This coupon code is not valid',
+          description: validation.message || 'This coupon code is not valid',
           variant: 'destructive',
         });
       }
     } catch (error: any) {
+      const errorMessage = couponService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to apply coupon',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useCart } from '@/contexts/CartContext';
-import { useUser } from '@/contexts/UserContext';
-import { categoriesAPI } from '@/services/api';
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useCart } from '@/stores/cartStore';
+import { useUser } from '@/stores/userStore';
+import { useCategoriesNavigationQuery } from '@/hooks/useCategoriesQuery';
 
 import NavLogo from './navbar/NavLogo';
 import DesktopNavigation from './navbar/DesktopNavigation';
@@ -24,9 +24,14 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFallback, setShowFallback] = useState(false);
-  const [navItems, setNavItems] = useState<NavItem[]>([]);
-  const [isLoadingNav, setIsLoadingNav] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Don't fetch categories navigation on auth-related routes
+  const isAuthRoute = ['/auth', '/forgot-password', '/reset-password', '/verify-email'].includes(location.pathname);
+
+  // Use React Query hook with caching - prevents duplicate API calls
+  const { data: navItems = [], isLoading: isLoadingNav } = useCategoriesNavigationQuery(isAuthRoute);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,27 +53,6 @@ const Navbar = () => {
     navigate(categoryId === 'all' ? '/products' : `/products?${queryString}`);
     setIsMenuOpen(false);
   };
-
-  // Fetch navigation items from backend
-  useEffect(() => {
-    const loadNavigation = async () => {
-      try {
-        setIsLoadingNav(true);
-        const response = await categoriesAPI.getNavigation();
-        // API interceptor already extracts data, so response is the data directly
-        const navigationData = Array.isArray(response) ? response : [];
-        setNavItems(navigationData as NavItem[]);
-      } catch (error) {
-        console.error('Failed to load navigation items:', error);
-        // Fallback to empty array if API fails
-        setNavItems([]);
-      } finally {
-        setIsLoadingNav(false);
-      }
-    };
-
-    loadNavigation();
-  }, []);
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">

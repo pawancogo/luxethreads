@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, User, ChevronDown, ChevronUp, Package, Heart, CreditCard, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useUser } from '@/contexts/UserContext';
+import { useUser, useUserActions } from '@/stores/userStore';
 
 interface NavItem {
   id: string;
@@ -32,7 +32,8 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   onCategoryClick,
   onClose
 }) => {
-  const { user, logout } = useUser();
+  const user = useUser();
+  const { logout } = useUserActions();
   const [isProfileExpanded, setIsProfileExpanded] = useState(false);
 
   if (!isOpen) return null;

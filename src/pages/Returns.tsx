@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Returns Page - Clean Architecture Implementation
+ * Uses ReturnService and OrderService for business logic
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,9 +15,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowLeft, Package, Loader2, CheckCircle, Clock, XCircle } from 'lucide-react';
-import { returnRequestsAPI, ordersAPI } from '@/services/api';
+import { returnService } from '@/services/return.service';
+import { orderService } from '@/services/order.service';
+import { ReturnRequestData } from '@/services/api/returns.service';
+import type { ReturnRequest } from '@/services/return.mapper';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/stores/userStore';
 
 interface OrderItem {
   id: number;
@@ -28,25 +37,6 @@ interface Order {
   order_date: string;
   status: string;
   items: OrderItem[];
-}
-
-interface ReturnRequest {
-  id: number;
-  return_id: string;
-  order_id: number;
-  status: string;
-  resolution_type: 'refund' | 'replacement';
-  items: Array<{
-    order_item_id: number;
-    quantity: number;
-    reason: string;
-  }>;
-  created_at: string;
-  status_history?: Array<{
-    status: string;
-    timestamp: string;
-    notes?: string;
-  }>;
 }
 
 const Returns = () => {
@@ -95,14 +85,13 @@ const Returns = () => {
   const loadOrders = async () => {
     setIsLoading(true);
     try {
-      const response = await ordersAPI.getMyOrders();
-      const ordersList = Array.isArray(response) ? response : [];
-      // Filter to only delivered orders
+      const ordersList = await orderService.getMyOrders();
       setOrders(ordersList.filter((o: any) => o.status === 'delivered'));
     } catch (error: any) {
+      const errorMessage = orderService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to load orders',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -113,12 +102,13 @@ const Returns = () => {
   const loadReturnRequests = async () => {
     setIsLoading(true);
     try {
-      const response = await returnRequestsAPI.getMyReturns();
-      setReturnRequests(Array.isArray(response) ? response : []);
+      const returnsList = await returnService.getMyReturns();
+      setReturnRequests(returnsList);
     } catch (error: any) {
+      const errorMessage = returnService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to load return requests',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -205,11 +195,12 @@ const Returns = () => {
 
     setIsCreating(true);
     try {
-      await returnRequestsAPI.createReturnRequest({
+      const returnData: ReturnRequestData = {
         order_id: returnForm.order_id,
         resolution_type: returnForm.resolution_type,
         items: returnForm.items,
-      });
+      };
+      await returnService.createReturnRequest(returnData);
 
       toast({
         title: 'Success',
@@ -225,9 +216,10 @@ const Returns = () => {
       });
       loadReturnRequests();
     } catch (error: any) {
+      const errorMessage = returnService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to create return request',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * ProductDetail Page - Clean Architecture Implementation
+ * Uses WishlistService and CartContext for business logic
+ * Follows: UI → Logic (Services/Contexts) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart } from 'lucide-react';
-import { productsAPI, cartAPI, productViewsAPI, wishlistAPI } from '@/services/api';
+import { productService } from '@/services/product.service';
+import { wishlistService } from '@/services/wishlist.service';
+import { useAddToCartMutation } from '@/hooks/useCartQuery';
 import { mapBackendProductDetail, findVariantByAttributes } from '@/lib/productMapper';
-import { Product } from '@/contexts/CartContext';
-import { useCart } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,7 +67,7 @@ const ProductDetail = () => {
   // Phase 2: Support slug or ID in URL
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { loadCart } = useCart();
+  const addToCartMutation = useAddToCartMutation();
   
   const [backendProduct, setBackendProduct] = useState<BackendProductDetail | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
@@ -79,13 +86,18 @@ const ProductDetail = () => {
       try {
         setIsLoading(true);
         // Phase 2: Backend supports slug or ID lookup
-        const response = await productsAPI.getPublicProduct(id);
-        const productData = response as any as BackendProductDetail;
-        setBackendProduct(productData);
+        const result = await productService.getPublicProduct(id);
         
-        // Map to frontend Product type  
-        const mappedProduct = mapBackendProductDetail(productData as any);
-        setProduct(mappedProduct);
+        if (!result) {
+          throw new Error('Product not found');
+        }
+        
+        const { product, rawData } = result;
+        
+        // Store backend product data for variant handling
+        const productData = rawData as BackendProductDetail;
+        setBackendProduct(productData);
+        setProduct(product);
         
         // Extract colors and sizes from variants (with null checks)
         const variants = productData.variants || [];
@@ -118,14 +130,11 @@ const ProductDetail = () => {
         }
         
         // Phase 4: Track product view (after variant is determined)
-        try {
-          await productViewsAPI.trackView(productData.id, {
+        if (product.id) {
+          await productService.trackProductView(Number(product.id), {
             product_variant_id: defaultVariantId || undefined,
             source: 'direct',
           });
-        } catch (error) {
-          // Silently fail - analytics tracking shouldn't break the page
-          console.error('Failed to track product view:', error);
         }
       } catch (error) {
         toast({
@@ -194,9 +203,7 @@ const ProductDetail = () => {
     }
 
     try {
-      await cartAPI.addToCart(selectedVariantId, 1);
-      // Reload cart to update cart count
-      await loadCart();
+      await addToCartMutation.mutateAsync({ productVariantId: selectedVariantId, quantity: 1 });
       toast({
         title: "Added to cart!",
         description: `${product.name} has been added to your cart.`,
@@ -231,7 +238,7 @@ const ProductDetail = () => {
         });
         setIsInWishlist(false);
       } else {
-        await wishlistAPI.addToWishlist(selectedVariantId);
+        await wishlistService.addToWishlist(selectedVariantId);
         toast({
           title: "Added to wishlist!",
           description: `${product.name} has been added to your wishlist.`,
@@ -239,7 +246,7 @@ const ProductDetail = () => {
         setIsInWishlist(true);
       }
     } catch (error: any) {
-      const errorMessage = error?.message || error?.errors?.[0] || "Failed to update wishlist";
+      const errorMessage = wishlistService.extractErrorMessage(error);
       toast({
         title: "Error",
         description: errorMessage,

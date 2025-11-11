@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from '@/hooks/useForm';
-import { useSupplier } from '@/contexts/SupplierContext';
+import { useSupplier } from '@/stores/supplierStore';
 
 interface UseProfileFormReturn {
   isEditing: boolean;

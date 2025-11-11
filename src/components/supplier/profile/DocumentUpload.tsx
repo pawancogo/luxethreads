@@ -1,20 +1,19 @@
-import React, { useState, useRef } from 'react';
+/**
+ * DocumentUpload Component - Clean Architecture Implementation
+ * Uses DocumentService for business logic
+ * Follows: UI → Logic (DocumentService) → Data (API Services)
+ */
+
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { supplierDocumentsAPI } from '@/services/api';
+import { documentService } from '@/services/document.service';
+import type { KYCDocument } from '@/services/document.mapper';
 import { Loader2, Upload, File, X, Download } from 'lucide-react';
 
-export interface KYCDocument {
-  id: number;
-  filename: string;
-  content_type: string;
-  byte_size: number;
-  url: string;
-  created_at: string;
-  size: string;
-}
+export type { KYCDocument };
 
 interface DocumentUploadProps {
   documents: KYCDocument[];
@@ -38,31 +37,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: 'Invalid file type',
-        description: 'Please upload a PDF, JPG, or PNG file.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
-    if (file.size > maxSize) {
-      toast({
-        title: 'File too large',
-        description: 'File size must be less than 10MB.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsUploading(true);
     try {
-      await supplierDocumentsAPI.uploadDocument(file);
+      await documentService.uploadDocument(file);
       toast({
         title: 'Success',
         description: 'Document uploaded successfully.',
@@ -73,7 +50,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         fileInputRef.current.value = '';
       }
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to upload document';
+      const errorMessage = documentService.extractErrorMessage(err);
       toast({
         title: 'Upload failed',
         description: errorMessage,
@@ -89,14 +66,14 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
     setIsDeleting(documentId);
     try {
-      await supplierDocumentsAPI.deleteDocument(documentId);
+      await documentService.deleteDocument(documentId);
       toast({
         title: 'Success',
         description: 'Document deleted successfully.',
       });
       onDocumentsChange();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to delete document';
+      const errorMessage = documentService.extractErrorMessage(err);
       toast({
         title: 'Delete failed',
         description: errorMessage,

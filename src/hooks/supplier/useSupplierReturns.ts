@@ -1,6 +1,12 @@
+/**
+ * useSupplierReturns Hook - Clean Architecture Implementation
+ * Uses SupplierService for business logic
+ * Follows: UI → Logic (SupplierService) → Data (API Services)
+ */
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { supplierReturnsAPI } from '@/services/api';
+import { supplierService } from '@/services/supplier.service';
 import { SupplierReturnRequest } from '@/components/supplier/types';
 
 interface UseSupplierReturnsReturn {
@@ -22,12 +28,10 @@ export const useSupplierReturns = (): UseSupplierReturnsReturn => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await supplierReturnsAPI.getSupplierReturns();
-      // API interceptor already extracts data, so response is the data directly
-      const returnsData = Array.isArray(response) ? response : [];
-      setReturns(returnsData);
+      const returnsList = await supplierService.getReturns();
+      setReturns(returnsList);
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load returns';
+      const errorMessage = supplierService.extractErrorMessage(err);
       setError(errorMessage);
       toast({
         title: 'Error',
@@ -41,14 +45,14 @@ export const useSupplierReturns = (): UseSupplierReturnsReturn => {
 
   const approveReturn = async (returnId: number, notes?: string): Promise<void> => {
     try {
-      await supplierReturnsAPI.approveReturn(returnId, notes);
+      await supplierService.approveReturn(returnId, notes);
       toast({
         title: 'Success',
         description: 'Return request approved successfully',
       });
       await loadReturns();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to approve return';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -60,14 +64,14 @@ export const useSupplierReturns = (): UseSupplierReturnsReturn => {
 
   const rejectReturn = async (returnId: number, rejectionReason: string): Promise<void> => {
     try {
-      await supplierReturnsAPI.rejectReturn(returnId, rejectionReason);
+      await supplierService.rejectReturn(returnId, rejectionReason);
       toast({
         title: 'Success',
         description: 'Return request rejected successfully',
       });
       await loadReturns();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to reject return';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -79,6 +83,7 @@ export const useSupplierReturns = (): UseSupplierReturnsReturn => {
 
   useEffect(() => {
     loadReturns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

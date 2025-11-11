@@ -1,6 +1,6 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
-import { useUser } from '@/contexts/UserContext';
+import { useUserActions } from '@/stores/userStore';
 import { Button } from '@/components/ui/button';
 import { SupplierProfile } from '../types';
 
@@ -10,7 +10,7 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ profile, userName }) => {
-  const { logout } = useUser();
+  const { logout } = useUserActions();
   const displayName = profile?.company_name || userName || 'Supplier';
   const tier = profile?.supplier_tier;
 

@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Product } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 import ProductsBreadcrumb from './ProductsBreadcrumb';
 import ProductsHeader from './ProductsHeader';
 import ProductsFilters from './ProductsFilters';
@@ -35,7 +35,7 @@ interface ProductsViewProps {
   showFilters: boolean;
   
   // Refs
-  loadMoreRef: React.RefObject<HTMLDivElement>;
+  loadMoreRef?: React.RefObject<HTMLDivElement>;
   
   // Handlers
   onSortChange: (sortBy: string) => void;

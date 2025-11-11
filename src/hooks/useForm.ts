@@ -1,4 +1,10 @@
-import { useState, useCallback } from 'react';
+/**
+ * useForm Hook - Clean Architecture Implementation
+ * Removed unnecessary useCallback hooks per YAGNI principle
+ * Simple state management doesn't require memoization
+ */
+
+import { useState } from 'react';
 
 export const useForm = <T extends Record<string, any>>(
   initialValues: T
@@ -11,21 +17,22 @@ export const useForm = <T extends Record<string, any>>(
 } => {
   const [values, setValues] = useState<T>(initialValues);
 
-  const setValue = useCallback(<K extends keyof T>(field: K, value: T[K]) => {
+  // Simple setters don't need useCallback - React handles re-renders efficiently
+  const setValue = <K extends keyof T>(field: K, value: T[K]) => {
     setValues((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  };
 
-  const updateValues = useCallback((newValues: Partial<T>) => {
+  const updateValues = (newValues: Partial<T>) => {
     setValues((prev) => ({ ...prev, ...newValues }));
-  }, []);
+  };
 
-  const reset = useCallback(() => {
+  const reset = () => {
     setValues(initialValues);
-  }, [initialValues]);
+  };
 
-  const resetTo = useCallback((newValues: T) => {
+  const resetTo = (newValues: T) => {
     setValues(newValues);
-  }, []);
+  };
 
   return {
     values,

@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard';
 import ProductSkeleton from '@/components/ProductSkeleton';
-import { Product } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 
 interface ProductsGridProps {
   filteredProducts: Product[];

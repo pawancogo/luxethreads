@@ -1,6 +1,13 @@
+/**
+ * useSupplierProducts Hook - Clean Architecture Implementation
+ * Uses SupplierService for business logic
+ * Follows: UI → Logic (SupplierService) → Data (API Services)
+ */
+
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { productsAPI } from '@/services/api';
+import { supplierService } from '@/services/supplier.service';
 import { SupplierProduct } from '@/components/supplier/types';
 
 interface UseSupplierProductsReturn {
@@ -35,6 +42,7 @@ interface UseSupplierProductsReturn {
 }
 
 export const useSupplierProducts = (): UseSupplierProductsReturn => {
+  const location = useLocation();
   const { toast } = useToast();
   const [products, setProducts] = useState<SupplierProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,29 +52,10 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await productsAPI.getSupplierProducts();
-      // API interceptor already extracts data, so response is the data directly
-      let products = Array.isArray(response) ? response : [];
-      
-      // Map backend response to frontend format
-      // Backend returns 'variants', ensure it's mapped to both variants and product_variants for compatibility
-      products = products.map((product: any) => {
-        const variants = product.variants || product.product_variants || [];
-        // Debug: Log variants for troubleshooting
-        if (variants.length > 0) {
-          console.log(`Product ${product.name} has ${variants.length} variant(s):`, variants);
-        }
-        return {
-          ...product,
-          // Ensure variants are available under both keys for compatibility
-          variants: variants,
-          product_variants: variants,
-        };
-      });
-      
-      setProducts(products);
+      const productsList = await supplierService.getProducts();
+      setProducts(productsList);
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load products';
+      const errorMessage = supplierService.extractErrorMessage(err);
       setError(errorMessage);
       toast({
         title: 'Error',
@@ -86,16 +75,11 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
     attribute_value_ids?: number[];
   }): Promise<number | null> => {
     try {
-      const response = await productsAPI.createProduct(data);
-      // API interceptor already extracts data
-      const productId = (response as any)?.id;
-      if (productId) {
-        await loadProducts();
-        return productId;
-      }
-      throw new Error('Product ID not found in response');
+      const product = await supplierService.createProduct(data);
+      await loadProducts();
+      return product?.id || null;
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to create product';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -116,14 +100,14 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
     }>
   ): Promise<void> => {
     try {
-      await productsAPI.updateProduct(id, data);
+      await supplierService.updateProduct(id, data);
       toast({
         title: 'Success',
         description: 'Product updated successfully',
       });
       await loadProducts();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to update product';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -135,14 +119,14 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
 
   const deleteProduct = async (id: number): Promise<void> => {
     try {
-      await productsAPI.deleteProduct(id);
+      await supplierService.deleteProduct(id);
       toast({
         title: 'Success',
         description: 'Product deleted successfully',
       });
       await loadProducts();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to delete product';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -152,9 +136,16 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
     }
   };
 
+  // Only load products when on supplier dashboard (not on signup)
   useEffect(() => {
-    loadProducts();
-  }, []);
+    const isSupplierDashboard = location.pathname === '/supplier' || 
+                                location.pathname.startsWith('/supplier/');
+    
+    if (isSupplierDashboard) {
+      loadProducts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const updateVariant = async (productId: number, variantId: number, data: {
     price: number;
@@ -165,14 +156,14 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
     attribute_value_ids?: number[];
   }): Promise<void> => {
     try {
-      await productsAPI.updateVariant(productId, variantId, data);
+      await supplierService.updateVariant(productId, variantId, data);
       toast({
         title: 'Success',
         description: 'Variant updated successfully',
       });
       await loadProducts();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to update variant';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -184,14 +175,14 @@ export const useSupplierProducts = (): UseSupplierProductsReturn => {
 
   const deleteVariant = async (productId: number, variantId: number): Promise<void> => {
     try {
-      await productsAPI.deleteVariant(productId, variantId);
+      await supplierService.deleteVariant(productId, variantId);
       toast({
         title: 'Success',
         description: 'Variant deleted successfully',
       });
       await loadProducts();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to delete variant';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,

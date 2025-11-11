@@ -1,69 +1,76 @@
-# React + TypeScript + Vite
+# Luxe Threads Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 18 + TypeScript application powered by Vite and shadcn/ui components.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Node.js** - Version specified in `.node-version` (currently: 24.11.0)
+- **npm** - Comes with Node.js
 
-## Expanding the ESLint configuration
+Optional tooling: `pnpm` or `yarn` if you prefer alternate package managers.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Note:** Versions are managed via `.node-version` file (similar to `.nvmrc` for Node.js). The setup script automatically reads this file.
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Initial Setup
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+From the frontend directory:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd luxethreads
+./setup_frontend.sh
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+**📖 For detailed setup instructions, see [FRONTEND_PROJECT_SETUP.md](./FRONTEND_PROJECT_SETUP.md)**
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Or manually:
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd luxethreads
+npm install
 ```
+
+## Day-to-Day Commands
+
+### Run the dev server
+
+```bash
+npm run dev          # launches Vite at http://localhost:5173
+```
+
+### Build & preview
+
+```bash
+npm run build        # compile production assets to dist/
+npm run preview      # serve the built app locally
+```
+
+### Quality checks
+
+```bash
+npm run lint         # eslint across the workspace
+```
+
+### Managing dependencies
+
+```bash
+npm install <pkg>@latest     # add or upgrade
+npm outdated                 # list available updates
+```
+
+### Stop the dev server
+
+```bash
+# Press Ctrl+C in the dev server terminal
+# Or kill detached processes manually:
+pkill -f "vite"
+```
+
+## Environment Variables
+
+- Copy `.env.example` to `.env.local` (if present) and populate API endpoints or keys.
+- Keep `.env` values aligned with backend expectations when adding new flags.
+
+## Troubleshooting
+
+- Mismatched Node version? Run `nvm use 24.11.0` (or your manager equivalent).
+- Clean install issues by deleting `node_modules` and `package-lock.json`, then rerun `npm install`.

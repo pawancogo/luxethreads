@@ -1,6 +1,12 @@
-import React, { useState, memo, useMemo } from 'react';
+/**
+ * ProductCard Component - Clean Architecture Implementation
+ * Removed unnecessary useMemo and memo wrapper
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Product } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 import { Badge } from '@/components/ui/badge';
 import { Heart, Star } from 'lucide-react';
 import { ProductBadges } from '@/components/products/ProductBadges';
@@ -16,19 +22,17 @@ interface ProductCardProps {
   };
 }
 
-const ProductCard: React.FC<ProductCardProps> = memo(({ product }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const discountPercentage = useMemo(() => 
-    product.originalPrice 
-      ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-      : 0,
-    [product.originalPrice, product.price]
-  );
+  // Calculate discount percentage directly (no need for useMemo for simple calculations)
+  const discountPercentage = product.originalPrice 
+    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+    : 0;
 
   const rating = 4.2; // Mock rating
-  const ratingCount = useMemo(() => Math.floor(Math.random() * 1000) + 100, []);
+  const ratingCount = Math.floor(Math.random() * 1000) + 100;
 
   return (
     <div className="group relative bg-white border border-gray-200 rounded-md overflow-hidden hover:shadow-lg transition-all duration-300">
@@ -170,8 +174,6 @@ const ProductCard: React.FC<ProductCardProps> = memo(({ product }) => {
       </Link>
     </div>
   );
-});
-
-ProductCard.displayName = 'ProductCard';
+};
 
 export default ProductCard;

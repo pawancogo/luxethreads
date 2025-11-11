@@ -1,6 +1,14 @@
+/**
+ * useCategoriesAndBrands Hook - Clean Architecture Implementation
+ * Removed unnecessary useCallback hooks
+ * Uses services instead of direct API calls
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { categoriesAPI, brandsAPI } from '@/services/api';
+import { categoriesService } from '@/services/api/categories.service';
+import { brandsService } from '@/services/api/brands.service';
 import { Category, Brand } from '@/components/supplier/types';
 
 interface UseCategoriesAndBrandsReturn {
@@ -23,8 +31,7 @@ export const useCategoriesAndBrands = (): UseCategoriesAndBrandsReturn => {
   const loadCategories = async () => {
     try {
       setIsLoadingCategories(true);
-      const response = await categoriesAPI.getAll();
-      // API interceptor already extracts data, so response is the data directly
+      const response = await categoriesService.getAll();
       const categories = Array.isArray(response) ? response : [];
       setCategories(categories);
     } catch (err: any) {
@@ -43,8 +50,7 @@ export const useCategoriesAndBrands = (): UseCategoriesAndBrandsReturn => {
   const loadBrands = async () => {
     try {
       setIsLoadingBrands(true);
-      const response = await brandsAPI.getAll();
-      // API interceptor already extracts data, so response is the data directly
+      const response = await brandsService.getAll();
       const brands = Array.isArray(response) ? response : [];
       setBrands(brands);
     } catch (err: any) {
@@ -66,6 +72,7 @@ export const useCategoriesAndBrands = (): UseCategoriesAndBrandsReturn => {
 
   useEffect(() => {
     refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

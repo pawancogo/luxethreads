@@ -1,7 +1,12 @@
-// Reusable user authentication hook
-// Wraps authService and stores tokens consistently
-import { useCallback, useMemo, useState } from 'react';
-import { authService, type LoginResponse, type SignupData } from '@/services/api';
+/**
+ * useAuth Hook - Simplified
+ * Uses UserService for business logic
+ * Removed unnecessary hooks (useCallback, useMemo) per YAGNI principle
+ */
+
+import { useState, useEffect } from 'react';
+import { userService } from '@/services/user.service';
+import type { LoginResponse, SignupData } from '@/services/api/auth.service';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -12,50 +17,100 @@ interface AuthState {
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
-    isAuthenticated: !!localStorage.getItem('auth_token'),
-    loading: false,
+    isAuthenticated: false,
+    loading: true,
     error: null,
-    user: JSON.parse(localStorage.getItem('user') || 'null'),
+    user: null,
   });
 
-  const login = useCallback(async (email: string, password: string): Promise<LoginResponse> => {
-    setState((s) => ({ ...s, loading: true, error: null }));
-    try {
-      const res = await authService.login(email, password);
-      // Preserve existing behavior: token already stored by service; user may be returned
-      if (res?.user) localStorage.setItem('user', JSON.stringify(res.user));
-      setState({ isAuthenticated: true, loading: false, error: null, user: res?.user || null });
-      return res;
-    } catch (e: any) {
-      setState((s) => ({ ...s, loading: false, error: e?.message || 'Login failed' }));
-      throw e;
-    }
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await userService.getCurrentUser();
+        setState({
+          isAuthenticated: !!user,
+          loading: false,
+          error: null,
+          user: user || null,
+        });
+      } catch (error) {
+        setState({
+          isAuthenticated: false,
+          loading: false,
+          error: null,
+          user: null,
+        });
+      }
+    };
+    fetchUser();
   }, []);
 
-  const signup = useCallback(async (data: SignupData): Promise<LoginResponse> => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+  const login = async (email: string, password: string): Promise<LoginResponse> => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const res = await authService.signup(data);
-      if (res?.user) localStorage.setItem('user', JSON.stringify(res.user));
-      setState({ isAuthenticated: true, loading: false, error: null, user: res?.user || null });
-      return res;
+      const result = await userService.login(email, password);
+      if (result.success && result.user) {
+        setState({
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+          user: result.user,
+        });
+        return { user: result.user } as LoginResponse;
+      }
+      throw new Error('Login failed');
     } catch (e: any) {
-      setState((s) => ({ ...s, loading: false, error: e?.message || 'Signup failed' }));
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: e?.message || 'Login failed',
+      }));
       throw e;
     }
-  }, []);
+  };
 
-  const logout = useCallback(() => {
-    authService.logout();
+  const signup = async (data: SignupData): Promise<LoginResponse> => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const name = `${data.first_name} ${data.last_name}`.trim();
+      const result = await userService.signup(
+        name,
+        data.email,
+        data.password,
+        data.role as any,
+        undefined,
+        undefined,
+        data.phone_number
+      );
+      if (result.success && result.user) {
+        setState({
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+          user: result.user,
+        });
+        return { user: result.user } as LoginResponse;
+      }
+      throw new Error('Signup failed');
+    } catch (e: any) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: e?.message || 'Signup failed',
+      }));
+      throw e;
+    }
+  };
+
+  const logout = async () => {
+    await userService.logout();
     setState({ isAuthenticated: false, loading: false, error: null, user: null });
-  }, []);
+  };
 
-  const value = useMemo(() => ({
+  return {
     ...state,
     login,
     signup,
     logout,
-  }), [state, login, signup, logout]);
-
-  return value;
+  };
 }

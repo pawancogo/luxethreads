@@ -1,47 +1,15 @@
+/**
+ * ProductTable Component - Clean Architecture Implementation
+ * Uses AttributeService for color hex map loading
+ * Follows: UI → Logic (AttributeService) → Data (API Services)
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { SupplierProduct } from '../types';
-import { attributeTypesAPI } from '@/services/api';
-
-// Color hex code map loaded from backend
-let colorHexMap: Record<string, string> = {};
-
-// Load color hex codes from backend
-const loadColorHexMap = async () => {
-  try {
-    const response = await attributeTypesAPI.getAll();
-    const attributeTypes = Array.isArray(response) ? response : [];
-    
-    if (!Array.isArray(attributeTypes) || attributeTypes.length === 0) {
-      console.warn('Attribute types API did not return valid data');
-      return;
-    }
-    
-    const colorType = attributeTypes.find((at: any) => at.name?.toLowerCase() === 'color');
-    if (colorType?.values && Array.isArray(colorType.values)) {
-      const map: Record<string, string> = {};
-      colorType.values.forEach((value: any) => {
-        if (value.hex_code && value.value) {
-          map[value.value] = value.hex_code;
-        }
-      });
-      colorHexMap = map;
-      console.log('Loaded color hex map:', Object.keys(map).length, 'colors');
-    }
-  } catch (error) {
-    console.error('Failed to load color hex map:', error);
-  }
-};
-
-// Initialize color map on module load
-loadColorHexMap();
-
-// Helper function to get color hex code
-const getColorHex = (colorName: string): string | null => {
-  return colorHexMap[colorName] || null;
-};
+import { attributeService } from '@/services/attribute.service';
 
 interface ProductTableProps {
   products: SupplierProduct[];
@@ -67,14 +35,25 @@ const ProductTable: React.FC<ProductTableProps> = ({
   getProductTotalStock,
 }) => {
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
-  const [colorMapLoaded, setColorMapLoaded] = useState(false);
+  const [colorHexMap, setColorHexMap] = useState<Record<string, string>>({});
 
   // Load color hex map when component mounts
   useEffect(() => {
-    if (!colorMapLoaded) {
-      loadColorHexMap().then(() => setColorMapLoaded(true));
-    }
-  }, [colorMapLoaded]);
+    const loadColorMap = async () => {
+      try {
+        const map = await attributeService.getColorHexMap();
+        setColorHexMap(map);
+      } catch (error) {
+        console.error('Failed to load color hex map:', error);
+      }
+    };
+    loadColorMap();
+  }, []);
+
+  // Helper function to get color hex code
+  const getColorHex = (colorName: string): string | null => {
+    return colorHexMap[colorName] || null;
+  };
 
   const toggleExpand = (productId: number) => {
     setExpandedProducts((prev) => {

@@ -1,29 +1,18 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * LoyaltyPoints Page - Clean Architecture Implementation
+ * Uses LoyaltyPointsService for business logic
+ * Follows: UI → Logic (LoyaltyPointsService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Gift, TrendingUp, TrendingDown, Clock, Loader2 } from 'lucide-react';
-import { loyaltyPointsAPI } from '@/services/api';
+import { loyaltyPointsService } from '@/services/loyalty-points.service';
+import type { LoyaltyTransaction, Balance } from '@/services/loyalty-points.mapper';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-
-interface LoyaltyTransaction {
-  id: number;
-  transaction_type: 'earned' | 'redeemed' | 'expired' | 'adjusted';
-  points: number;
-  balance_after: number;
-  reference_type?: string;
-  reference_id?: number;
-  description?: string;
-  expiry_date?: string;
-  created_at: string;
-}
-
-interface Balance {
-  balance: number;
-  pending_expiry: number;
-  available_balance: number;
-}
 
 const LoyaltyPoints: React.FC = () => {
   const [balance, setBalance] = useState<Balance | null>(null);
@@ -39,14 +28,13 @@ const LoyaltyPoints: React.FC = () => {
 
   const fetchBalance = async () => {
     try {
-      const response = await loyaltyPointsAPI.getBalance();
-      if (response.data?.success && response.data?.data) {
-        setBalance(response.data.data);
-      }
+      const balanceData = await loyaltyPointsService.getBalance();
+      setBalance(balanceData);
     } catch (error: any) {
+      const errorMessage = loyaltyPointsService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch loyalty points balance',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -55,16 +43,15 @@ const LoyaltyPoints: React.FC = () => {
   const fetchTransactions = async (type?: string) => {
     setIsLoading(true);
     try {
-      const response = await loyaltyPointsAPI.getTransactions(
+      const transactionsList = await loyaltyPointsService.getTransactions(
         type ? { transaction_type: type as any } : undefined
       );
-      if (response.data?.success && response.data?.data) {
-        setTransactions(response.data.data);
-      }
+      setTransactions(transactionsList);
     } catch (error: any) {
+      const errorMessage = loyaltyPointsService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch transactions',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

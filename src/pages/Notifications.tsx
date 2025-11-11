@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bell, CheckCheck, Loader2, Package, CreditCard, Gift, MessageSquare, Settings, Truck } from 'lucide-react';
-import { useNotifications } from '@/contexts/NotificationContext';
+import { useNotifications, useNotificationList, useUnreadCount, useNotificationLoading } from '@/stores/notificationStore';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -46,7 +46,10 @@ const getNotificationColor = (type: string) => {
 };
 
 const Notifications: React.FC = () => {
-  const { notifications, unreadCount, isLoading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
+  const notifications = useNotificationList();
+  const unreadCount = useUnreadCount();
+  const isLoading = useNotificationLoading();
+  const { fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
   const { toast } = useToast();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 

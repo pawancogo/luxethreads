@@ -1,6 +1,12 @@
+/**
+ * useSupplierProfile Hook - Clean Architecture Implementation
+ * Uses SupplierService for business logic
+ * Follows: UI → Logic (SupplierService) → Data (API Services)
+ */
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { supplierProfileAPI } from '@/services/api';
+import { supplierService } from '@/services/supplier.service';
 import { SupplierProfile } from '@/components/supplier/types';
 
 interface UseSupplierProfileReturn {
@@ -32,21 +38,16 @@ export const useSupplierProfile = (): UseSupplierProfileReturn => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await supplierProfileAPI.getProfile();
-      // API interceptor already extracts data, so response is the data directly
-      const profileData = response || {};
-      setProfile(profileData as unknown as SupplierProfile);
+      const profileData = await supplierService.getProfile();
+      setProfile(profileData);
     } catch (err: any) {
-      // Profile might not exist yet, that's okay
-      if (err?.status !== 404) {
-        const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load profile';
-        setError(errorMessage);
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-      }
+      const errorMessage = supplierService.extractErrorMessage(err);
+      setError(errorMessage);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
       setProfile(null);
     } finally {
       setIsLoading(false);
@@ -60,14 +61,14 @@ export const useSupplierProfile = (): UseSupplierProfileReturn => {
     website_url: string;
   }): Promise<void> => {
     try {
-      await supplierProfileAPI.updateProfile(data);
+      await supplierService.updateProfile(data);
       toast({
         title: 'Success',
         description: 'Supplier profile updated successfully',
       });
       await loadProfile();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to update profile';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -84,14 +85,14 @@ export const useSupplierProfile = (): UseSupplierProfileReturn => {
     website_url: string;
   }): Promise<void> => {
     try {
-      await supplierProfileAPI.createProfile(data);
+      await supplierService.createProfile(data);
       toast({
         title: 'Success',
         description: 'Supplier profile created successfully',
       });
       await loadProfile();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to create profile';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -103,6 +104,7 @@ export const useSupplierProfile = (): UseSupplierProfileReturn => {
 
   useEffect(() => {
     loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

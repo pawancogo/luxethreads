@@ -161,7 +161,7 @@ export const productsService = {
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/products/export`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
+        // Cookies are automatically sent with requests (withCredentials: true)
       },
     });
     if (!response.ok) {
@@ -178,7 +178,7 @@ export const productsService = {
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/products/export_template`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
+        // Cookies are automatically sent with requests (withCredentials: true)
       },
     });
     if (!response.ok) {

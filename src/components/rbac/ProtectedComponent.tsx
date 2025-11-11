@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRbac } from '@/contexts/RbacContext';
+import { useRbac } from '@/stores/rbacStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldX } from 'lucide-react';
 

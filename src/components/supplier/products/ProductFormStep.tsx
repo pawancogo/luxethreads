@@ -1,3 +1,9 @@
+/**
+ * ProductFormStep Component - Clean Architecture Implementation
+ * Uses AttributeService for attribute operations
+ * Follows: UI → Logic (AttributeService) → Data (API Services)
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -12,14 +18,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { Category, Brand } from '../types';
-import { attributeTypesAPI } from '@/services/api';
-
-interface AttributeType {
-  id: number;
-  name: string;
-  level?: 'product' | 'variant';
-  values: Array<{ id: number; value: string; hex_code?: string }>;
-}
+import { attributeService } from '@/services/attribute.service';
+import type { AttributeType } from '@/services/attribute.mapper';
 
 interface SelectedAttribute {
   attributeTypeId: number;
@@ -76,23 +76,17 @@ const ProductFormStep: React.FC<ProductFormStepProps> = ({
       setIsLoadingAttributes(true);
       // Load only product-level attributes (Fabric, Material, etc.)
       const categoryId = parseInt(productForm.category_id);
-      const response = await attributeTypesAPI.getAll('product', categoryId);
-      
-      // API interceptor already extracts data, so response is the data directly
-      let data: any[] = [];
-      if (Array.isArray(response)) {
-        data = response;
-      } else if (typeof response === 'object' && response !== null) {
-        // If response is an object, check if it has data property or is already the array
-        // @ts-ignore - Response format may vary, handled safely
-        data = (response as any).data || (response as any).attribute_types || response || [];
-      }
+      const attributeTypesArray = await attributeService.getAllAttributeTypes({
+        level: 'product',
+        category_id: categoryId,
+      });
       
       // Filter to only include attribute types that have values
-      const attributeTypesArray: AttributeType[] = (Array.isArray(data) ? data : [])
-        .filter((type: any) => type.values && type.values.length > 0);
+      const filteredAttributeTypes = attributeTypesArray.filter(
+        (type) => type.values && type.values.length > 0
+      );
       
-      setAttributeTypes(attributeTypesArray);
+      setAttributeTypes(filteredAttributeTypes);
     } catch (error: any) {
       setAttributeTypes([]);
     } finally {

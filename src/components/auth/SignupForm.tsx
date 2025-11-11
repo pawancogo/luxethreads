@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, UserRole } from '@/contexts/UserContext';
+import { useUserActions, useUserLoading, UserRole } from '@/stores/userStore';
 
 interface SignupFormProps {
   onSwitchToLogin: () => void;
@@ -22,7 +22,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     companyName: '',
     taxId: '',
   });
-  const { signup, isLoading } = useUser();
+  const { signup } = useUserActions();
+  const isLoading = useUserLoading();
   const { toast } = useToast();
 
   const getErrorMessage = (error: Error | undefined): string => {
@@ -58,7 +59,13 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     );
 
     if (result.success) {
-      toast({ title: 'Account created!', description: 'Your account has been created successfully.' });
+      toast({ 
+        title: 'Account created!', 
+        description: 'Your account has been created successfully.' 
+      });
+      
+      // Don't navigate here - let Auth.tsx handle the redirect based on user state
+      // This prevents infinite re-renders from conflicting navigation
     } else {
       const errorMessage = getErrorMessage(result.error);
       toast({
@@ -116,6 +123,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               type="tel"
               value={formData.phone_number}
               onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+              required
             />
           </div>
           <div>

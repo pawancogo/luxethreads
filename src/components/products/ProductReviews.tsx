@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * ProductReviews Component - Clean Architecture Implementation
+ * Uses ReviewService for business logic
+ * Follows: UI → Logic (ReviewService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,28 +20,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Star, ThumbsUp, ThumbsDown, Verified, Loader2, MessageSquare } from 'lucide-react';
-import { reviewsAPI } from '@/services/api';
+import { reviewService } from '@/services/review.service';
+import type { Review } from '@/services/review.mapper';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/contexts/UserContext';
-
-interface Review {
-  id: number;
-  user: {
-    id: number;
-    name: string;
-    email?: string;
-  };
-  rating: number;
-  title?: string;
-  comment: string;
-  is_verified_purchase?: boolean;
-  is_featured?: boolean;
-  helpful_count?: number;
-  not_helpful_count?: number;
-  review_images?: string[];
-  created_at: string;
-  supplier_response?: string;
-}
+import { useUser } from '@/stores/userStore';
 
 interface ProductReviewsProps {
   productId: number;
@@ -76,12 +64,13 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, averageRatin
         params.featured = true;
       }
 
-      const response = await reviewsAPI.getProductReviews(productId, params);
-      setReviews(Array.isArray(response) ? response : []);
+      const reviewsList = await reviewService.getProductReviews(productId, params);
+      setReviews(reviewsList);
     } catch (error: any) {
+      const errorMessage = reviewService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: 'Failed to load reviews',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -110,7 +99,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, averageRatin
 
     setIsSubmitting(true);
     try {
-      await reviewsAPI.createReview(productId, {
+      await reviewService.createReview(productId, {
         rating: newReview.rating,
         title: newReview.title,
         comment: newReview.comment,
@@ -125,9 +114,10 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, averageRatin
       setNewReview({ rating: 5, title: '', comment: '' });
       loadReviews();
     } catch (error: any) {
+      const errorMessage = reviewService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to submit review',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -146,11 +136,11 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, averageRatin
     }
 
     try {
-      await reviewsAPI.voteHelpful(productId, reviewId, isHelpful);
+      await reviewService.voteOnReview(productId, reviewId, isHelpful ? 'helpful' : 'not_helpful');
       loadReviews();
     } catch (error: any) {
       // Silently fail - voting shouldn't break the page
-      console.error('Failed to vote:', error);
+      // Error is handled silently to prevent UI disruption
     }
   };
 

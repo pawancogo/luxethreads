@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useUser } from '@/contexts/UserContext';
+import { Navigate } from 'react-router-dom';
+import { useUser, useUserLoading } from '@/stores/userStore';
 import { useStatusBadge } from '@/hooks/supplier/useStatusBadge';
 import { useProductUtils } from '@/hooks/supplier/useProductUtils';
 import { useSupplierProducts } from '@/hooks/supplier/useSupplierProducts';
@@ -15,7 +16,8 @@ import SupplierDashboardView from './SupplierDashboardView';
 import { SupplierProduct } from '../types';
 
 const SupplierDashboardContainer: React.FC = () => {
-  const { user } = useUser();
+  const user = useUser();
+  const isLoadingUser = useUserLoading();
 
   // Data hooks - MUST be called before any early returns to follow Rules of Hooks
   const productsHook = useSupplierProducts();
@@ -102,14 +104,12 @@ const SupplierDashboardContainer: React.FC = () => {
   const { getStatusBadge } = useStatusBadge();
   const { getProductMinPrice, getProductTotalStock } = useProductUtils();
 
-  // Helper function to clear all authentication data
+  // Helper function to clear authentication cookies
   const clearAuthData = () => {
-    // Clear localStorage
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth_token');
-    
+    // No localStorage - tokens are in cookies only
     // Clear specific auth cookies
     document.cookie = 'authtoken=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+    document.cookie = 'auth_token=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
     
     // Clear all other cookies
     document.cookie.split(";").forEach((c) => {
@@ -120,26 +120,38 @@ const SupplierDashboardContainer: React.FC = () => {
   };
 
   // Early return if user is not loaded or not a supplier (AFTER all hooks)
-  if (!user) {
-    // Clear all authentication data and redirect to login
-    clearAuthData();
-    window.location.href = '/auth';
+  // Show loading while user or data is being fetched
+  if (isLoadingUser || productsHook.isLoading || ordersHook.isLoading || profileHook.isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="text-center text-gray-600">Redirecting to login...</div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-amber-600"></div>
       </div>
     );
   }
 
-  if (user.role !== 'supplier') {
-    // Clear all authentication data and redirect to login for non-suppliers
-    clearAuthData();
-    window.location.href = '/auth';
+  // CRITICAL: Check if user is being set (session exists but user state not ready)
+  // This prevents redirecting to /auth when user state is being set after signup
+  const hasLoggedIn = sessionStorage.getItem('user_logged_in') === 'true';
+  const isUserBeingSet = hasLoggedIn && !user && !isLoadingUser;
+
+  // Wait for user state to be set - don't redirect immediately
+  if (isUserBeingSet) {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="text-center text-gray-600">Redirecting to login...</div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-amber-600"></div>
       </div>
     );
+  }
+
+  // Redirect if user is not authenticated (use Navigate to avoid page reload)
+  // Only redirect if we're sure user is not logged in (not just being set)
+  if (!user && !isUserBeingSet) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  // Redirect if user is not a supplier
+  if (user && user.role !== 'supplier') {
+    return <Navigate to="/" replace />;
   }
 
   // Handlers
@@ -230,7 +242,7 @@ const SupplierDashboardContainer: React.FC = () => {
     }
 
     try {
-      const { productsAPI } = await import('@/services/api');
+      const { productsService } = await import('@/services/api/products.service');
       // Filter out empty image URLs
       const imageUrls = (newVariantForm.values.image_urls || [])
         .filter((url: string) => url && url.trim() !== '');
@@ -252,7 +264,7 @@ const SupplierDashboardContainer: React.FC = () => {
         attribute_value_ids: attributeValueIds.length > 0 ? attributeValueIds : undefined,
       };
       
-      await productsAPI.createVariant(selectedProductId, payload);
+      await productsService.createVariant(selectedProductId, payload);
       addVariantDialog.close();
       newVariantForm.reset();
       setSelectedProductId(null);

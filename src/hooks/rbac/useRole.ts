@@ -1,4 +1,4 @@
-import { useRbac } from '@/contexts/RbacContext';
+import { useRbac, useRbacPrimaryRole, useRbacRoles } from '@/stores/rbacStore';
 
 /**
  * Hook to check if user has a specific role
@@ -18,15 +18,13 @@ export const useRole = (roleSlug: string | string[]): boolean => {
  * Hook to get user's primary role
  */
 export const usePrimaryRole = () => {
-  const { primaryRole } = useRbac();
-  return primaryRole;
+  return useRbacPrimaryRole();
 };
 
 /**
  * Hook to get all user roles
  */
 export const useRoles = () => {
-  const { roles } = useRbac();
-  return roles;
+  return useRbacRoles();
 };
 

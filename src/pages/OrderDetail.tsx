@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * OrderDetail Page - Clean Architecture Implementation
+ * Uses OrderService for business logic
+ * Follows: UI → Logic (OrderService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,11 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Package, Truck, MapPin, CreditCard, Download, X } from 'lucide-react';
-import { ordersAPI, shippingAPI, returnRequestsAPI } from '@/services/api';
+import { ArrowLeft, Truck, MapPin, CreditCard, Download, X, Loader2 } from 'lucide-react';
+import { orderService } from '@/services/order.service';
+import { shipmentService } from '@/services/shipment.service';
+import type { Shipment, TrackingEvent } from '@/services/shipment.repository';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/contexts/UserContext';
-import { Loader2 } from 'lucide-react';
+import { useUser } from '@/stores/userStore';
 
 interface OrderItem {
   id: number;
@@ -19,26 +26,6 @@ interface OrderItem {
   price_at_purchase: number;
   image_url?: string;
   sku?: string;
-}
-
-interface Shipment {
-  id: number;
-  tracking_number?: string;
-  tracking_url?: string;
-  status: string;
-  shipping_provider?: string;
-  estimated_delivery_date?: string;
-  actual_delivery_date?: string;
-}
-
-interface TrackingEvent {
-  id: number;
-  event_type: string;
-  event_description?: string;
-  location?: string;
-  city?: string;
-  state?: string;
-  event_time: string;
 }
 
 interface OrderDetail {
@@ -103,27 +90,24 @@ const OrderDetail = () => {
 
   const loadOrderDetails = async () => {
     if (!id) return;
-    
+
     setIsLoading(true);
     try {
-      const orderData = await ordersAPI.getOrderDetails(id);
+      const orderData = await orderService.getOrderDetails(id);
       setOrder(orderData as any);
 
-      // Load shipments
-      try {
-        const shipmentsData = await shippingAPI.getOrderShipments(parseInt(id));
-        const shipmentsList = Array.isArray(shipmentsData) ? shipmentsData : [];
-        setShipments(shipmentsList);
-        if (shipmentsList.length > 0) {
-          setSelectedShipment(shipmentsList[0].id);
-        }
-      } catch (error) {
-        // Silently fail - shipments might not exist
+      // Load shipments using service layer
+      const shipmentsList = await shipmentService.getOrderShipments(parseInt(id));
+      setShipments(shipmentsList);
+      const defaultShipment = shipmentService.getDefaultShipment(shipmentsList);
+      if (defaultShipment) {
+        setSelectedShipment(defaultShipment.id);
       }
     } catch (error: any) {
+      const errorMessage = orderService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to load order details',
+        description: errorMessage,
         variant: 'destructive',
       });
       navigate('/orders');
@@ -133,12 +117,8 @@ const OrderDetail = () => {
   };
 
   const loadTrackingEvents = async (shipmentId: number) => {
-    try {
-      const events = await shippingAPI.getShipmentTracking(shipmentId);
-      setTrackingEvents(Array.isArray(events) ? events : []);
-    } catch (error) {
-      // Silently fail
-    }
+    const events = await shipmentService.getShipmentTracking(shipmentId);
+    setTrackingEvents(events);
   };
 
   const handleCancelOrder = async () => {
@@ -155,19 +135,19 @@ const OrderDetail = () => {
 
     setIsCancelling(true);
     try {
-      await ordersAPI.cancelOrder(id, cancellationReason.trim());
+      await orderService.cancelOrder(id, cancellationReason.trim());
       toast({
         title: 'Order Cancelled',
         description: 'Your order has been cancelled successfully. Refund will be processed if payment was made.',
       });
       setIsCancelDialogOpen(false);
       setCancellationReason('');
-      // Reload order details
       loadOrderDetails();
     } catch (error: any) {
+      const errorMessage = orderService.extractErrorMessage(error);
       toast({
         title: 'Cancellation Failed',
-        description: error?.message || 'Failed to cancel order. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -183,25 +163,16 @@ const OrderDetail = () => {
     if (!order || !id) return;
 
     try {
-      const response = await ordersAPI.downloadInvoice(id);
-      const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `invoice-${order.order_number || order.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
+      await orderService.downloadInvoice(id, order.order_number);
       toast({
         title: 'Invoice Downloaded',
         description: 'Your invoice has been downloaded successfully',
       });
     } catch (error: any) {
+      const errorMessage = orderService.extractErrorMessage(error);
       toast({
         title: 'Download Failed',
-        description: error?.message || 'Failed to download invoice. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     }

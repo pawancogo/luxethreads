@@ -1,4 +1,4 @@
-import { Product } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 
 // Phase 2: Enhanced Backend API Product Response Types
 interface BackendProduct {

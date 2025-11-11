@@ -1,3 +1,9 @@
+/**
+ * EditProductDialog Component - Clean Architecture Implementation
+ * Uses AttributeService for attribute operations
+ * Follows: UI → Logic (AttributeService) → Data (API Services)
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -14,14 +20,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { SupplierProduct } from '../types';
-import { attributeTypesAPI } from '@/services/api';
-
-interface AttributeType {
-  id: number;
-  name: string;
-  level?: 'product' | 'variant';
-  values: Array<{ id: number; value: string; hex_code?: string }>;
-}
+import { attributeService } from '@/services/attribute.service';
+import type { AttributeType } from '@/services/attribute.mapper';
 
 interface SelectedAttribute {
   attributeTypeId: number;
@@ -82,18 +82,10 @@ const EditProductDialog: React.FC<EditProductDialogProps> = ({
       // Load only product-level attributes (Fabric, Material, etc.)
       // Pass categoryId if available for any category-specific filtering
       const categoryId = productForm.category_id ? parseInt(productForm.category_id) : editingProduct?.category_id;
-      const response = await attributeTypesAPI.getAll('product', categoryId);
-      console.log('Loaded product-level attribute types response:', response);
-      
-      // API interceptor already extracts data, so response is the data directly
-      let data: any[] = [];
-      if (Array.isArray(response)) {
-        data = response;
-      } else if (typeof response === 'object' && response !== null) {
-        data = [];
-      }
-      
-      const attributeTypesArray: AttributeType[] = Array.isArray(data) ? data : [];
+      const attributeTypesArray = await attributeService.getAllAttributeTypes({
+        level: 'product',
+        category_id: categoryId,
+      });
       console.log('Parsed product-level attribute types:', attributeTypesArray);
       
       setAttributeTypes(attributeTypesArray);
@@ -107,8 +99,7 @@ const EditProductDialog: React.FC<EditProductDialogProps> = ({
 
   const loadSelectedAttributes = async () => {
     try {
-      const response = await attributeTypesAPI.getAll();
-      const allAttributeTypes: AttributeType[] = Array.isArray(response) ? response : [];
+      const allAttributeTypes = await attributeService.getAllAttributeTypes();
       
       const selected: SelectedAttribute[] = [];
       (productForm.attribute_value_ids || []).forEach((valueId: number) => {
@@ -138,8 +129,7 @@ const EditProductDialog: React.FC<EditProductDialogProps> = ({
     
     try {
       // Load all attribute types to map attribute names to IDs
-      const response = await attributeTypesAPI.getAll();
-      const allAttributeTypes: AttributeType[] = Array.isArray(response) ? response : [];
+      const allAttributeTypes = await attributeService.getAllAttributeTypes();
       
       const selected: SelectedAttribute[] = [];
       

@@ -1,4 +1,10 @@
-import React, { useMemo } from 'react';
+/**
+ * PayoutsTab Component - Clean Architecture Implementation
+ * Removed unnecessary useMemo hook
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, DollarSign, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import { SupplierPayment } from './types';
@@ -11,26 +17,25 @@ interface PayoutsTabProps {
 }
 
 const PayoutsTab: React.FC<PayoutsTabProps> = ({ payments, isLoadingPayments }) => {
-  const financialSummary = useMemo(() => {
-    const completed = payments.filter((p) => p.status === 'completed');
-    const pending = payments.filter((p) => p.status === 'pending' || p.status === 'processing');
-    const failed = payments.filter((p) => p.status === 'failed');
+  // Calculate financial summary directly (no need for useMemo for simple calculations)
+  const completed = payments.filter((p) => p.status === 'completed');
+  const pending = payments.filter((p) => p.status === 'pending' || p.status === 'processing');
+  const failed = payments.filter((p) => p.status === 'failed');
 
-    const totalPaid = completed.reduce((sum, p) => sum + p.net_amount, 0);
-    const totalPending = pending.reduce((sum, p) => sum + p.net_amount, 0);
-    const totalCommission = payments.reduce((sum, p) => sum + (p.commission_deducted || 0), 0);
-    const totalGross = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = completed.reduce((sum, p) => sum + p.net_amount, 0);
+  const totalPending = pending.reduce((sum, p) => sum + p.net_amount, 0);
+  const totalCommission = payments.reduce((sum, p) => sum + (p.commission_deducted || 0), 0);
+  const totalGross = payments.reduce((sum, p) => sum + p.amount, 0);
 
-    return {
-      totalPaid,
-      totalPending,
-      totalCommission,
-      totalGross,
-      completedCount: completed.length,
-      pendingCount: pending.length,
-      failedCount: failed.length,
-    };
-  }, [payments]);
+  const financialSummary = {
+    totalPaid,
+    totalPending,
+    totalCommission,
+    totalGross,
+    completedCount: completed.length,
+    pendingCount: pending.length,
+    failedCount: failed.length,
+  };
 
   if (isLoadingPayments) {
     return (
@@ -59,7 +64,7 @@ const PayoutsTab: React.FC<PayoutsTabProps> = ({ payments, isLoadingPayments }) 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(financialSummary.totalPaid)}
+              <CurrencyDisplay amount={financialSummary.totalPaid} size="lg" />
             </div>
             <p className="text-xs text-muted-foreground">
               {financialSummary.completedCount} completed payments

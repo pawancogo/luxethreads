@@ -1,4 +1,4 @@
-import { Product } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 
 export const mockProducts: Product[] = [
   {

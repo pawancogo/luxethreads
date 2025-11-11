@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Orders Page - Clean Architecture Implementation
+ * Uses OrderService for business logic
+ * Follows: UI → Logic (OrderService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Package, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/stores/userStore';
 import { useToast } from '@/hooks/use-toast';
-import { ordersAPI } from '@/services/api';
+import { orderService } from '@/services/order.service';
 
 interface Order {
   id: number;
@@ -39,13 +45,13 @@ const Orders = () => {
   const loadOrders = async () => {
     setIsLoading(true);
     try {
-      const response = await ordersAPI.getMyOrders();
-      // API interceptor already extracts data, so response is the data directly
-      setOrders(Array.isArray(response) ? response : []);
+      const ordersList = await orderService.getMyOrders();
+      setOrders(ordersList);
     } catch (error: any) {
+      const errorMessage = orderService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to load orders',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

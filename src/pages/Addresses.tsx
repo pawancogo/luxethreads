@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+/**
+ * Addresses Page - Clean Architecture Implementation
+ * Uses AddressService for business logic
+ * Follows: UI → Logic (AddressService) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,26 +14,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/contexts/UserContext';
-import { addressesAPI } from '@/services/api';
-import { MapPin, Plus, Edit, Trash2, Check, X, Loader2 } from 'lucide-react';
-
-interface Address {
-  id: number;
-  address_type: 'shipping' | 'billing';
-  full_name: string;
-  phone_number: string;
-  line1: string;
-  line2?: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
-  label?: string;
-  is_default_shipping?: boolean;
-  is_default_billing?: boolean;
-  delivery_instructions?: string;
-}
+import { useUser } from '@/stores/userStore';
+import { addressService } from '@/services/address.service';
+import { Address } from '@/services/address.mapper';
+import { MapPin, Plus, Edit, Trash2, Check, Loader2 } from 'lucide-react';
 
 const Addresses = () => {
   const { user } = useUser();
@@ -64,12 +53,13 @@ const Addresses = () => {
   const loadAddresses = async () => {
     setIsLoading(true);
     try {
-      const response = await addressesAPI.getAddresses();
-      setAddresses(Array.isArray(response) ? response : []);
+      const addressesList = await addressService.getAddresses();
+      setAddresses(addressesList);
     } catch (error: any) {
+      const errorMessage = addressService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to load addresses',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -146,13 +136,13 @@ const Addresses = () => {
     setIsSaving(true);
     try {
       if (editingAddress) {
-        await addressesAPI.updateAddress(editingAddress.id, formData);
+        await addressService.updateAddress(editingAddress.id, formData);
         toast({
           title: 'Success',
           description: 'Address updated successfully',
         });
       } else {
-        await addressesAPI.createAddress(formData);
+        await addressService.createAddress(formData);
         toast({
           title: 'Success',
           description: 'Address added successfully',
@@ -162,9 +152,10 @@ const Addresses = () => {
       resetForm();
       loadAddresses();
     } catch (error: any) {
+      const errorMessage = addressService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to save address',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -178,16 +169,17 @@ const Addresses = () => {
     }
 
     try {
-      await addressesAPI.deleteAddress(addressId);
+      await addressService.deleteAddress(addressId);
       toast({
         title: 'Success',
         description: 'Address deleted successfully',
       });
       loadAddresses();
     } catch (error: any) {
+      const errorMessage = addressService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to delete address',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -198,23 +190,24 @@ const Addresses = () => {
       const address = addresses.find(a => a.id === addressId);
       if (!address) return;
 
-      const updateData: any = {};
+      const updateData: Partial<Address> = {};
       if (type === 'shipping') {
         updateData.is_default_shipping = !address.is_default_shipping;
       } else {
         updateData.is_default_billing = !address.is_default_billing;
       }
 
-      await addressesAPI.updateAddress(addressId, updateData);
+      await addressService.updateAddress(addressId, updateData);
       toast({
         title: 'Success',
         description: `Default ${type} address updated`,
       });
       loadAddresses();
     } catch (error: any) {
+      const errorMessage = addressService.extractErrorMessage(error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to update default address',
+        description: errorMessage,
         variant: 'destructive',
       });
     }

@@ -1,6 +1,13 @@
+/**
+ * useSupplierOrders Hook - Clean Architecture Implementation
+ * Uses SupplierService for business logic
+ * Follows: UI → Logic (SupplierService) → Data (API Services)
+ */
+
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { supplierOrdersAPI } from '@/services/api';
+import { supplierService } from '@/services/supplier.service';
 import { SupplierOrder } from '@/components/supplier/types';
 
 interface UseSupplierOrdersReturn {
@@ -14,6 +21,7 @@ interface UseSupplierOrdersReturn {
 }
 
 export const useSupplierOrders = (): UseSupplierOrdersReturn => {
+  const location = useLocation();
   const { toast } = useToast();
   const [orders, setOrders] = useState<SupplierOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,12 +31,10 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await supplierOrdersAPI.getSupplierOrders();
-      // API interceptor already extracts data, so response is the data directly
-      const orders = Array.isArray(response) ? response : [];
-      setOrders(orders);
+      const ordersList = await supplierService.getOrders();
+      setOrders(ordersList);
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to load orders';
+      const errorMessage = supplierService.extractErrorMessage(err);
       setError(errorMessage);
       toast({
         title: 'Error',
@@ -42,14 +48,14 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
 
   const confirmOrderItem = async (orderItemId: number): Promise<void> => {
     try {
-      await supplierOrdersAPI.confirmOrderItem(orderItemId);
+      await supplierService.confirmOrderItem(orderItemId);
       toast({
         title: 'Success',
         description: 'Order item confirmed successfully',
       });
       await loadOrders();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to confirm order';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -61,14 +67,14 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
 
   const shipOrder = async (orderItemId: number, trackingNumber: string): Promise<void> => {
     try {
-      await supplierOrdersAPI.shipOrderItem(orderItemId, trackingNumber);
+      await supplierService.shipOrderItem(orderItemId, trackingNumber);
       toast({
         title: 'Success',
         description: 'Order marked as shipped successfully',
       });
       await loadOrders();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to ship order';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -80,14 +86,14 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
 
   const updateTracking = async (orderItemId: number, trackingNumber: string, trackingUrl?: string): Promise<void> => {
     try {
-      await supplierOrdersAPI.updateTracking(orderItemId, trackingNumber, trackingUrl);
+      await supplierService.updateTracking(orderItemId, trackingNumber, trackingUrl);
       toast({
         title: 'Success',
         description: 'Tracking information updated successfully',
       });
       await loadOrders();
     } catch (err: any) {
-      const errorMessage = err?.errors?.[0] || err?.message || 'Failed to update tracking';
+      const errorMessage = supplierService.extractErrorMessage(err);
       toast({
         title: 'Error',
         description: errorMessage,
@@ -97,9 +103,16 @@ export const useSupplierOrders = (): UseSupplierOrdersReturn => {
     }
   };
 
+  // Only load orders when on supplier dashboard (not on signup)
   useEffect(() => {
-    loadOrders();
-  }, []);
+    const isSupplierDashboard = location.pathname === '/supplier' || 
+                                location.pathname.startsWith('/supplier/');
+    
+    if (isSupplierDashboard) {
+      loadOrders();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   return {
     orders,

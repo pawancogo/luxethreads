@@ -1,8 +1,18 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Checkout Page - Clean Architecture Implementation
+ * Uses AddressService and OrderService for business logic
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '@/contexts/CartContext';
-import { useUser } from '@/contexts/UserContext';
-import { addressesAPI, ordersAPI, couponsAPI } from '@/services/api';
+import { useCart } from '@/stores/cartStore';
+import { useUser } from '@/stores/userStore';
+import { addressService } from '@/services/address.service';
+import { Address } from '@/services/address.mapper';
+import { orderService } from '@/services/order.service';
+import { OrderData } from '@/services/api/orders.service';
+import { couponService } from '@/services/coupon.service';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,24 +21,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 
-interface Address {
-  id: number;
-  address_type: 'shipping' | 'billing';
-  full_name: string;
-  phone_number: string;
-  line1: string;
-  line2?: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
-  is_default_shipping?: boolean;
-  is_default_billing?: boolean;
-}
 
 const Checkout = () => {
   const { state, clearCart, loadCart } = useCart();
-  const { user } = useUser();
+  const user = useUser();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -63,21 +59,20 @@ const Checkout = () => {
       
       try {
         setIsLoadingAddresses(true);
-        const response = await addressesAPI.getAddresses();
-        const addressList = Array.isArray(response) ? response : [];
+        const addressList = await addressService.getAddresses();
         setAddresses(addressList);
-        
+
         // Auto-select default shipping address, or first address if no default
         if (addressList.length > 0) {
-          const defaultShipping = addressList.find(a => a.is_default_shipping);
+          const defaultShipping = addressService.findDefaultShippingAddress(addressList);
           if (defaultShipping) {
             setSelectedShippingAddress(defaultShipping.id);
           } else {
             setSelectedShippingAddress(addressList[0].id);
           }
-          
+
           // Auto-select default billing address, or 'same' if default shipping is also default billing
-          const defaultBilling = addressList.find(a => a.is_default_billing);
+          const defaultBilling = addressService.findDefaultBillingAddress(addressList);
           if (defaultBilling) {
             if (defaultShipping && defaultShipping.id === defaultBilling.id) {
               setSelectedBillingAddress('same');
@@ -137,11 +132,11 @@ const Checkout = () => {
     setIsApplyingCoupon(true);
     try {
       // Validate coupon first
-      const validation: any = await couponsAPI.validateCoupon(couponCode.trim());
+      const validation = await couponService.validateCoupon(couponCode.trim());
       
       if (validation && (validation.is_valid !== false || validation.code)) {
         // Apply coupon
-        const result: any = await couponsAPI.applyCoupon(couponCode.trim(), state.total);
+        const result = await couponService.applyCoupon(couponCode.trim(), state.total);
         setAppliedCoupon(result.coupon || validation);
         setDiscountAmount(result.discount_amount || 0);
         toast({
@@ -216,7 +211,7 @@ const Checkout = () => {
 
       // Create or use shipping address
       if (selectedShippingAddress === 'new') {
-        const shippingAddress = await addressesAPI.createAddress({
+        const shippingAddress = await addressService.createAddress({
           address_type: 'shipping',
           full_name: formData.full_name,
           phone_number: formData.phone_number,
@@ -227,8 +222,7 @@ const Checkout = () => {
           postal_code: formData.postal_code,
           country: formData.country,
         });
-        // API interceptor already extracts data
-        shippingAddressId = (shippingAddress as any)?.id;
+        shippingAddressId = shippingAddress.id;
       } else {
         shippingAddressId = selectedShippingAddress;
       }
@@ -238,7 +232,7 @@ const Checkout = () => {
         billingAddressId = shippingAddressId;
       } else if (selectedBillingAddress === 'new') {
         // Create billing address (same as shipping for now, can be enhanced)
-        const billingAddress = await addressesAPI.createAddress({
+        const billingAddress = await addressService.createAddress({
           address_type: 'billing',
           full_name: formData.full_name,
           phone_number: formData.phone_number,
@@ -249,20 +243,20 @@ const Checkout = () => {
           postal_code: formData.postal_code,
           country: formData.country,
         });
-        // API interceptor already extracts data
-        billingAddressId = (billingAddress as any)?.id;
+        billingAddressId = billingAddress.id;
       } else {
         billingAddressId = selectedBillingAddress;
       }
 
       // Create order
-      const order = await ordersAPI.createOrder({
+      const orderData: OrderData = {
         shipping_address_id: shippingAddressId,
         billing_address_id: billingAddressId,
         shipping_method: shippingMethod,
         payment_method_id: paymentMethod === 'cod' ? undefined : paymentMethod,
         coupon_code: appliedCoupon ? couponCode.trim() : undefined,
-      });
+      };
+      const order = await orderService.createOrder(orderData);
 
       toast({
         title: "Order placed successfully!",

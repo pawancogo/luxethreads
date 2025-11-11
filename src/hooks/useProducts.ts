@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/**
+ * useProducts Hook - Clean Architecture Implementation
+ * Removed unnecessary useCallback and useMemo hooks
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import { useEffect, useState } from 'react';
 import { productsService, type ProductFilters } from '@/services/api';
 
 interface UseProductsState<T = any> {
@@ -11,7 +17,7 @@ export function useProducts(initialFilters?: ProductFilters) {
   const [filters, setFilters] = useState<ProductFilters>(initialFilters || {});
   const [state, setState] = useState<UseProductsState<any[]>>({ data: null, loading: false, error: null });
 
-  const fetchProducts = useCallback(async (params?: ProductFilters) => {
+  const fetchProducts = async (params?: ProductFilters) => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const res = await productsService.getPublicProducts(params || filters);
@@ -21,27 +27,25 @@ export function useProducts(initialFilters?: ProductFilters) {
       setState({ data: null, loading: false, error: e?.message || 'Failed to load products' });
       throw e;
     }
-  }, [filters]);
+  };
 
   useEffect(() => {
     fetchProducts().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const value = useMemo(() => ({
+  return {
     ...state,
     filters,
     setFilters,
     refetch: fetchProducts,
-  }), [state, filters, fetchProducts]);
-
-  return value;
+  };
 }
 
 export function useProduct(idOrSlug: string | number | null | undefined) {
   const [state, setState] = useState<UseProductsState<any>>({ data: null, loading: false, error: null });
 
-  const fetchProduct = useCallback(async () => {
+  const fetchProduct = async () => {
     if (!idOrSlug) return null;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
@@ -52,11 +56,15 @@ export function useProduct(idOrSlug: string | number | null | undefined) {
       setState({ data: null, loading: false, error: e?.message || 'Failed to load product' });
       throw e;
     }
-  }, [idOrSlug]);
+  };
 
   useEffect(() => {
     fetchProduct().catch(() => {});
-  }, [fetchProduct]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idOrSlug]);
 
-  return useMemo(() => ({ ...state, refetch: fetchProduct }), [state, fetchProduct]);
+  return {
+    ...state,
+    refetch: fetchProduct,
+  };
 }

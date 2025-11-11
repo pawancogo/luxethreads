@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useFilter } from '@/contexts/FilterContext';
+import { useFilter, useFilters, useFilterResults, useFilterLoading, useFilterError, useAvailableFilters } from '@/stores/filterStore';
 import { mapBackendProductToList } from '@/lib/productMapper';
-import { Product } from '@/contexts/CartContext';
+import { Product } from '@/types/product';
 import ProductsBreadcrumb from '@/components/products/ProductsBreadcrumb';
 import AdvancedProductFilters from '@/components/products/AdvancedProductFilters';
 import ProductCard from '@/components/ProductCard';
@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 // Sort Select Component
 const SortSelect: React.FC = () => {
-  const { filters, setFilter, availableFilters } = useFilter();
+  const filters = useFilters();
+  const availableFilters = useAvailableFilters();
+  const { setFilter } = useFilter();
   
   return (
     <Select
@@ -45,13 +47,11 @@ const SortSelect: React.FC = () => {
 };
 
 const ProductsWithFilters: React.FC = () => {
-  const {
-    results,
-    isLoading,
-    error,
-    loadMore,
-    filters,
-  } = useFilter();
+  const results = useFilterResults();
+  const isLoading = useFilterLoading();
+  const error = useFilterError();
+  const filters = useFilters();
+  const { loadMore } = useFilter();
   
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');

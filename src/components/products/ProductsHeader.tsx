@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SlidersHorizontal, Grid3X3, LayoutGrid } from 'lucide-react';
-import { useProduct } from '@/contexts/ProductContext';
+import { useCategoriesQuery } from '@/hooks/useCategoriesQuery';
 
 interface ProductsHeaderProps {
   selectedCategory: string;
@@ -23,7 +23,7 @@ const ProductsHeader: React.FC<ProductsHeaderProps> = ({
   onSortChange,
   onViewModeChange
 }) => {
-  const { categories } = useProduct();
+  const { data: categories = [] } = useCategoriesQuery(false);
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('recommended');
 

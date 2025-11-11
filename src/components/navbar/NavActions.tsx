@@ -11,14 +11,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useCart } from '@/contexts/CartContext';
-import { useUser } from '@/contexts/UserContext';
-import { useNotifications } from '@/contexts/NotificationContext';
+import { useCartItemCount } from '@/stores/cartStore';
+import { useUser, useUserActions } from '@/stores/userStore';
+import { useNotifications, useUnreadCount } from '@/stores/notificationStore';
 
 const NavActions: React.FC = () => {
-  const { state } = useCart();
-  const { user, logout } = useUser();
-  const { unreadCount, notifications, markAsRead } = useNotifications();
+  const itemCount = useCartItemCount();
+  const user = useUser();
+  const { logout } = useUserActions();
+  const { notifications, markAsRead } = useNotifications();
+  const unreadCount = useUnreadCount();
 
   return (
     <div className="hidden md:flex items-center space-x-4">
@@ -199,9 +201,9 @@ const NavActions: React.FC = () => {
           <span className="text-xs text-gray-800 group-hover:text-pink-600 font-medium block mt-0.5">
             Bag
           </span>
-          {state.itemCount > 0 && (
+          {itemCount > 0 && (
             <Badge className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs min-w-[16px] h-[16px] flex items-center justify-center rounded-full p-0 text-[10px]">
-              {state.itemCount}
+              {itemCount}
             </Badge>
           )}
         </Link>

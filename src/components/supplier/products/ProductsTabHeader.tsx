@@ -1,4 +1,10 @@
-import React from 'react';
+/**
+ * ProductsTabHeader Component - Clean Architecture Implementation
+ * Uses ProductService for business logic
+ * Follows: UI → Logic (Services) → Data (API Services)
+ */
+
+import { useState } from 'react';
 import { CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Upload, Download } from 'lucide-react';
@@ -6,7 +12,7 @@ import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import ProductCreationDialog from '../ProductCreationDialog';
 import BulkUploadDialog from './BulkUploadDialog';
 import { Category, Brand, ProductVariantForm } from '../types';
-import { productsAPI } from '@/services/api';
+import { supplierService } from '@/services/supplier.service';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductsTabHeaderProps {
@@ -59,19 +65,12 @@ const ProductsTabHeader: React.FC<ProductsTabHeaderProps> = ({
   onProductsRefresh,
 }) => {
   const { toast } = useToast();
-  const [isBulkUploadOpen, setIsBulkUploadOpen] = React.useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
   const handleExportProducts = async () => {
     try {
-      const blob = await productsAPI.exportProducts();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `products_export_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const blob = await supplierService.exportProducts();
+      supplierService.downloadFile(blob, supplierService.generateExportFilename('products'));
       
       toast({
         title: 'Export Successful',

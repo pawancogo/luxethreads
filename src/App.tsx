@@ -1,20 +1,22 @@
+/**
+ * App Component - Main application entry point
+ * Modernized with Zustand stores for state management
+ * Performance optimized with route-based providers
+ */
+
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { CartProvider } from "@/contexts/CartContext";
-import { UserProvider } from "@/contexts/UserContext";
-import { AdminProvider } from "@/contexts/AdminContext";
-import { RbacProvider } from "@/contexts/RbacContext";
-import { SupplierProvider } from "@/contexts/SupplierContext";
-import { ProductProvider } from "@/contexts/ProductContext";
-import { FilterProvider } from "@/contexts/FilterContext";
-import { NotificationProvider } from "@/contexts/NotificationContext";
+import { useUserInit } from "@/stores/userStore";
+import { useRbacInit } from "@/stores/rbacStore";
+import { useFilterAutoLoad } from "@/hooks/useFilterAutoLoad";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import RootRoute from "@/components/RootRoute";
 import Home from "@/pages/Home";
 import Products from "@/pages/Products";
 import ProductsWithFilters from "@/pages/ProductsWithFilters";
@@ -36,34 +38,49 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import VerifyEmail from "@/pages/VerifyEmail";
 import Addresses from "@/pages/Addresses";
-import AdminLogin from "@/pages/admin/AdminLogin";
-import AdminUsers from "@/pages/admin/Users";
-import AdminSuppliers from "@/pages/admin/Suppliers";
-import AdminProducts from "@/pages/admin/Products";
-import AdminOrders from "@/pages/admin/Orders";
-import AdminReports from "@/pages/admin/Reports";
-import AdminPromotions from "@/pages/admin/Promotions";
-import AdminCoupons from "@/pages/admin/Coupons";
-import AdminSettings from "@/pages/admin/Settings";
-import AdminEmailTemplates from "@/pages/admin/EmailTemplates";
-
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
+// Configure React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: true,
+      retry: 1,
+    },
+  },
+});
 
 const AppContent = () => {
   const location = useLocation();
-  const isSupplierDashboard = location.pathname === '/supplier';
+  const isSupplierRoute = location.pathname.startsWith('/supplier');
+  const isProductsPage = location.pathname.includes('/products');
+
+  // Initialize user on mount
+  useUserInit();
+
+  // Initialize RBAC based on user role
+  useRbacInit();
+
+  // Auto-load filters on products pages (hook must be called unconditionally)
+  useFilterAutoLoad();
+
+  // Clean up session storage on mount
+  useEffect(() => {
+    sessionStorage.removeItem('requires_verification');
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {!isSupplierDashboard && <Navbar />}
+      {!isSupplierRoute && <Navbar />}
       <main className="flex-1">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<RootRoute />} />
           <Route path="/products" element={<Products />} />
           <Route path="/products-filtered" element={<ProductsWithFilters />} />
-          {/* Phase 2: Support slug or ID in route */}
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route
             path="/cart"
@@ -80,7 +97,6 @@ const AppContent = () => {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order-confirmation" element={<OrderConfirmation />} />
           
-          {/* User Routes */}
           <Route
             path="/profile"
             element={
@@ -154,7 +170,6 @@ const AppContent = () => {
             }
           />
           
-          {/* Supplier Routes */}
           <Route
             path="/supplier"
             element={
@@ -164,130 +179,41 @@ const AppContent = () => {
             } 
           />
           
-          {/* Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route
-            path="/admin/users"
+          <Route 
+            path="/admin/*" 
             element={
-              <AdminProtectedRoute allowedRoles={['super_admin', 'user_admin']}>
-                <AdminUsers />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/suppliers"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin', 'supplier_admin']}>
-                <AdminSuppliers />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/products"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin', 'product_admin']}>
-                <AdminProducts />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/orders"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin', 'order_admin']}>
-                <AdminOrders />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/reports"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin', 'order_admin', 'product_admin', 'user_admin']}>
-                <AdminReports />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/promotions"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin', 'product_admin']}>
-                <AdminPromotions />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/coupons"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin', 'product_admin']}>
-                <AdminCoupons />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/settings"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin']}>
-                <AdminSettings />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/email-templates"
-            element={
-              <AdminProtectedRoute allowedRoles={['super_admin']}>
-                <AdminEmailTemplates />
-              </AdminProtectedRoute>
-            }
+              <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                  <h1 className="text-2xl font-bold mb-4">Admin Panel</h1>
+                  <p className="text-gray-600 mb-4">Admin functionality is available at the backend interface.</p>
+                  <a 
+                    href={`${import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:3000'}/admin/login`}
+                    className="text-amber-600 hover:text-amber-700 underline"
+                  >
+                    Go to Admin Panel
+                  </a>
+                </div>
+              </div>
+            } 
           />
           
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      {!isSupplierDashboard && <Footer />}
+      {!isSupplierRoute && <Footer />}
     </div>
   );
 };
 
 const App = () => {
-  // Determine user type for RBAC context
-  const getUserType = (): 'admin' | 'supplier' | 'user' => {
-    // This will be determined based on current route or context
-    // For now, we'll check localStorage
-    if (typeof window !== 'undefined') {
-      if (localStorage.getItem('admin_token')) return 'admin';
-      if (localStorage.getItem('user')) {
-        try {
-          const user = JSON.parse(localStorage.getItem('user') || '{}');
-          if (user.role === 'supplier') return 'supplier';
-        } catch {}
-      }
-    }
-    return 'user';
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <UserProvider>
-          <AdminProvider>
-            <RbacProvider userType={getUserType()}>
-              <SupplierProvider>
-                <ProductProvider>
-                  <FilterProvider>
-                    <CartProvider>
-                      <NotificationProvider>
-                        <Toaster />
-                        <Sonner />
-                        <BrowserRouter>
-                          <AppContent />
-                        </BrowserRouter>
-                      </NotificationProvider>
-                    </CartProvider>
-                  </FilterProvider>
-                </ProductProvider>
-              </SupplierProvider>
-            </RbacProvider>
-          </AdminProvider>
-        </UserProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );

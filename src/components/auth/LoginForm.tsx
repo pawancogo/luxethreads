@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/contexts/UserContext';
+import { useUserActions, useUserLoading } from '@/stores/userStore';
 
 interface LoginFormProps {
   onSwitchToSignup: () => void;
@@ -13,7 +13,8 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const { login, isLoading } = useUser();
+  const { login } = useUserActions();
+  const isLoading = useUserLoading();
   const { toast } = useToast();
 
   const getErrorMessage = (error: Error | undefined): string => {

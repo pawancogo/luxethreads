@@ -1,5 +1,5 @@
 import React from 'react';
-import { useProduct } from '@/contexts/ProductContext';
+import { useCategoriesQuery } from '@/hooks/useCategoriesQuery';
 
 interface ProductsBreadcrumbProps {
   selectedCategory: string;
@@ -10,7 +10,7 @@ const ProductsBreadcrumb: React.FC<ProductsBreadcrumbProps> = ({
   selectedCategory,
   searchQuery
 }) => {
-  const { categories } = useProduct();
+  const { data: categories = [] } = useCategoriesQuery(false);
   const categoryName = selectedCategory !== 'all' 
     ? categories.find(c => c.id.toString() === selectedCategory || c.slug === selectedCategory)?.name
     : null;

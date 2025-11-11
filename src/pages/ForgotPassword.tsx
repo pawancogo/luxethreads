@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { authAPI } from '@/services/api';
+import { authService } from '@/services/auth.service';
 import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 
 const ForgotPassword = () => {
@@ -29,14 +29,15 @@ const ForgotPassword = () => {
 
     setIsLoading(true);
     try {
-      await authAPI.forgotPassword(email.trim());
+      await authService.forgotPassword(email.trim());
       setIsSuccess(true);
       toast({
         title: 'Email sent',
         description: 'If an account with that email exists, a password reset email has been sent.',
       });
     } catch (error: any) {
-      // Even on error, show success message to prevent email enumeration
+      // Service handles error silently to prevent email enumeration
+      // Always show success message
       setIsSuccess(true);
       toast({
         title: 'Email sent',
